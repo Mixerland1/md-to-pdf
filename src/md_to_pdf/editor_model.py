@@ -100,6 +100,8 @@ class DocumentEditor:
         for n in self._nodes():
             classes = (n.get("class") or "").split()
             role = "note" if "editor-note" in classes else "warning" if "editor-warning" in classes else n.tag
+            if role=="p" and any(a.tag=="blockquote" for a in n.iterancestors()):
+                role="blockquote"
             locked = n.tag in {"li", "td", "th"} or any(
                 a.tag in {"ul", "ol", "table", "blockquote", "li", "td", "th"} for a in n.iterancestors())
             result.append(Block("".join(n.itertext()), n.tag, role, locked))

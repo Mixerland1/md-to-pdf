@@ -1,6 +1,7 @@
 """Minimal single-document editor with real PDF page preview."""
 from __future__ import annotations
 import queue
+import re
 import sys
 import threading
 import webbrowser
@@ -142,6 +143,12 @@ def main():
                 brush_button.configure(text="Кисть")
                 apply_values(copied)
 
+    def display_family(value):
+        if value in ("","Разные"):
+            return value
+        key=re.sub(r"[^\w]","",value).casefold()
+        return next((f for f in fonts if re.sub(r"[^\w]","",f).casefold()==key),value)
+
     def update_fields():
         ws=state["workspace"]
         ranges=state["selection"]
@@ -153,7 +160,7 @@ def main():
         labels.update(mixed="Разные стили",li="Список",td="Ячейка",th="Шапка таблицы")
         role.set(labels.get(current,current))
         family,points=preview.selection_format()
-        font.set(family or "Шрифт")
+        font.set(display_family(family) or "Шрифт")
         size.set(points or "pt")
 
     def render(preserve=False):
@@ -233,7 +240,7 @@ def main():
         if not style or family in ("","Разные") or points in ("","Разные"):
             message("Для кисти выберите фрагмент с единым оформлением.")
             return
-        state["brush"]=[style,"font:"+family,"size:"+points]
+        state["brush"]=[style,"font:"+display_family(family),"size:"+points]
         brush_button.configure(text="Кисть ✓")
         message("Выберите фрагмент, к которому применить оформление.")
     def save():

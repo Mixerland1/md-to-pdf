@@ -5,12 +5,12 @@ MD to PDF remains the product name. The goal is local conversion of documents in
 
 ## Delivery stages
 - [x] A — Input adapter tests passed in CI. Input adapters: Markdown, TXT, DOCX; common semantic HTML pipeline; mixed-format batch and desktop file selection.
-- [ ] B — Initial Granulex typography preset committed; public OFL font provisioning and CSS refinements implemented; visual acceptance pending; logo tests passed. Brand profile schema and built-in Granulex preset, based on supplied CSS/settings. Preserve layout, typography, palette, tables, lists, code and quotes; document renderer differences.
+- [ ] B — Initial Granulex typography preset committed; public OFL font provisioning and CSS refinements implemented; visual preview approved; logo tests passed. Brand profile schema and built-in Granulex preset, based on supplied CSS/settings. Preserve layout, typography, palette, tables, lists, code and quotes; document renderer differences.
 - [ ] C — Granulex-specific leading header extraction and built-in SVG implemented; local profile persistence, path-only SVG and raster import now implemented; advanced SVG support and CI pending. SVG logo extraction/import, duplicate prevention, and local profile persistence; PNG/JPEG embedded in SVG is raster, not vector tracing. Keep vector paths for original SVG. Sanitize SVG, disallow scripts, external assets and unsafe references.
 - [ ] D — Initial editable profile library and desktop editor committed; automated tests and visual acceptance pending. Visual brand constructor: name, logo, colors, fonts, spacing, margins, header/footer, page numbering, table styles, preview, export/import profiles. Never require company docs to be published.
 - [ ] E — Additional corporate presets after verification of branding and redistribution rights; distinguish official from unofficial profiles. Do not distribute proprietary fonts/logos without permission.
 - [ ] F — DOCX faithful-layout mode as separate backend (evaluate LibreOffice or Word); do not confuse semantic re-styling with pixel-identical Word rendering.
-- [ ] G — Regression tests, example PDFs, GUI review, Windows frozen EXE tests and release 0.3.0.
+- [ ] G — Regression tests, example PDFs, GUI review, Windows x64 and macOS arm64/x86_64 frozen tests, GUI acceptance and release 0.3.0.
 
 ## Acceptance criteria
 - MD output remains compatible with 0.2.0; TXT content is escaped and line breaks preserved; DOCX semantic mode preserves supported headings, paragraphs, emphasis, lists, tables, internal/external hyperlinks, embedded raster images and reports import warnings.

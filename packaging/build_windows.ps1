@@ -14,6 +14,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 $root = 'dist/MD-to-PDF'
 Copy-Item LICENSE,README.md $root
+Copy-Item docs "$root/docs" -Recurse
+Copy-Item src/md_to_pdf/fonts/*-OFL.txt $root
 Copy-Item (Join-Path $MsysPrefix 'share/licenses') "$root/native-licenses" -Recurse
 # Record versions and preserve wheel license files for redistribution.
 & $Python -m pip freeze | Set-Content "$root/python-dependencies.txt"
@@ -31,4 +33,9 @@ $p = Start-Process -FilePath "$root/MD-to-PDF.exe" -ArgumentList "--smoke-test `
 if ($p.ExitCode -ne 0 -or !(Test-Path $out)) { throw 'Frozen EXE smoke test failed' }
 & $Python -c "from pypdf import PdfReader; r=PdfReader('windows-smoke.pdf'); assert 'Руководство' in r.pages[0].extract_text()"
 if ($LASTEXITCODE -ne 0) { throw 'Frozen PDF validation failed' }
+$brand = Join-Path $PWD 'windows-brand.pdf'
+$p = Start-Process -FilePath "$root/MD-to-PDF.exe" -ArgumentList "--brand-smoke-test `"$PWD/examples/granulex-style-check.md`" `"$brand`"" -Wait -PassThru
+if ($p.ExitCode -ne 0 -or !(Test-Path $brand)) { throw 'Frozen brand smoke test failed' }
+& $Python packaging/check_smoke.py $out $brand
+if ($LASTEXITCODE -ne 0) { throw 'Frozen brand PDF validation failed' }
 Compress-Archive -Path $root -DestinationPath 'MD-to-PDF-Windows-x64.zip' -Force

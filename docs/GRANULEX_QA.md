@@ -12,3 +12,5 @@ md-to-pdf examples/granulex-style-check.md --template granulex --brand-name "Gra
 Check A4, headings, nested lists, table, quote, inline code, code block, link, first-page header, footer, and embedded font names. CI checks actual embedded font families. Exact Chromium reference PDF has not been supplied; pixel-for-pixel comparison cannot be claimed. Font bundle and Windows build require successful CI before release.
 
 Local visual check: WeasyPrint 68.0, supplied static Montserrat 9.000 regular/bold and Roboto Mono 3.001. One-page A4 synthetic fixture rendered and inspected at 1200 px; correct logo, text, headings, nested lists, table, quote, code and page number; pdffonts confirmed embedded Montserrat and Roboto Mono. This is a local CSS preview with reference fonts, not a frozen EXE or exact upstream-variable-font render. The supplied logo.md has a stray quote before the third path closing tag; the legacy-header adapter now normalizes that specific malformed ending before strict SVG validation. Original logo path geometry unchanged.
+
+The project owner approved the supplied local visual preview. Frozen build checks remain required.

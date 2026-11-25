@@ -2,8 +2,8 @@ name: Windows portable build
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths: ['src/**', 'tests/**', 'packaging/**', 'pyproject.toml', '.github/workflows/windows.yml']
+    branches: [main, 'develop/v0.3.0']
+    paths: ['src/**', 'tests/**', 'packaging/**', 'scripts/**', 'examples/**', 'pyproject.toml', '.github/workflows/windows.yml']
 permissions:
   contents: read
 jobs:

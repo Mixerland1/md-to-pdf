@@ -113,3 +113,7 @@ python -m unittest discover -s tests -v
 ```
 
 Version 0.2.0. Reconstructed from an incomplete earlier prototype, not a byte-for-byte recovery. License: ISC.
+
+### Planned desktop builds (0.3.0)
+
+Windows x64 and macOS Apple Silicon / Intel test builds are configured in the development branch. See [platform notes](docs/PLATFORMS.md). These are not yet published stable binaries.

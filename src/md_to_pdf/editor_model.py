@@ -118,6 +118,30 @@ class DocumentEditor:
     def html(self):
         return html.tostring(self._doc, encoding="unicode", method="html", doctype="<!doctype html>")
 
+    def _header_nodes(self):
+        headers = self._main.xpath('./div[contains(concat(" ",normalize-space(@class)," ")," doc-header ")]')
+        if not headers:
+            return []
+        nodes = []
+        for query in ('./div[@class="header-left"]/span','./div[@class="header-right"]/span[@class="header-right-title"]','./div[@class="header-right"]/span[@class="header-right-update"]'):
+            found = headers[0].xpath(query)
+            if len(found)!=1:
+                return []
+            nodes.append(found[0])
+        return nodes
+
+    def header_fields(self):
+        nodes = self._header_nodes()
+        return tuple(n.text or "" for n in nodes) if nodes else None
+
+    def set_header(self, name, version, updated):
+        nodes = self._header_nodes()
+        if not nodes:
+            raise ValueError("No brand header")
+        self._checkpoint()
+        for node,value in zip(nodes,(name,version,updated)):
+            node.text = value.strip()
+
     def _checkpoint(self):
         self._undo.append(self.html())
         self._redo.clear()

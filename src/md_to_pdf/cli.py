@@ -5,6 +5,7 @@ import argparse
 from datetime import date
 from html import escape, unescape
 from pathlib import Path
+import tempfile
 import re
 import sys
 from urllib.parse import urlsplit, unquote
@@ -133,7 +134,14 @@ def write_rendered_pdf(html: str, source: Path, output: Path, *, css: Path | Non
                     return default.fetch(url, *args, **kwargs)
             raise ValueError(f"Blocked resource outside local document folders: {url}")
 
-    HTML(string=html, base_url=source.parent.as_uri() + "/", url_fetcher=LocalFetcher()).write_pdf(output)
+    # Replace an existing PDF only after successful rendering.
+    with tempfile.NamedTemporaryFile(dir=output.parent,suffix=".pdf",delete=False) as stream:
+        temporary = Path(stream.name)
+    try:
+        HTML(string=html, base_url=source.parent.as_uri() + "/", url_fetcher=LocalFetcher()).write_pdf(temporary)
+        temporary.replace(output)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:

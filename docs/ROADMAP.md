@@ -26,3 +26,5 @@ Separate development branch; review and test changes before integration. Record 
 
 ## 0.4.0 priority — Visual editor
 Before expanding the corporate preset library, implement direct selection-based styling as defined in [VISUAL_EDITOR.md](VISUAL_EDITOR.md). Stages 1–2 initial range-based semantic model and native text selection UI are committed on the separate development branch; automated and manual verification, project persistence and release pending. Preserve the quick batch workflow and source files.
+
+Desktop UX redesign in 0.4.0: see [UX.md](UX.md). Simplified main screen, automatic replacement of PDFs, style library, font selection and contextual header editing implemented; GUI acceptance pending.

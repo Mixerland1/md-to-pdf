@@ -59,3 +59,13 @@ class EditorTests(unittest.TestCase):
             self.assertIn("Alpha linked tail.",page.extract_text())
             self.assertTrue(any(a.get_object().get("/A",{}).get("/URI")=="https://example.com" for a in page["/Annots"]))
             self.assertEqual(source.read_text(encoding="utf-8"),original)
+
+    def test_header_edit_undo(self):
+        from md_to_pdf.branding import Header, render_header
+        model=DocumentEditor("<html><head></head><body><main>"+render_header(Header())+"<p>Body</p></main></body></html>")
+        self.assertEqual(model.header_fields(),("Granulex","",""))
+        model.set_header("Other & Co","Версия 2.0","Последнее обновление: 2026")
+        self.assertEqual(model.header_fields()[0],"Other & Co")
+        self.assertIn("Other &amp; Co",model.html())
+        self.assertTrue(model.undo())
+        self.assertEqual(model.header_fields(),("Granulex","",""))

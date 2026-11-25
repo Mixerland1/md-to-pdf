@@ -151,17 +151,38 @@ def open_editor(parent, source: Path, **options):
             status.set("Действие восстановлено" if redo else "Действие отменено")
 
     def export():
-        path = filedialog.asksaveasfilename(parent=win, defaultextension=".pdf",
-                    initialfile=source.stem+"-styled.pdf", filetypes=[("PDF","*.pdf")])
-        if not path:
-            return
+        path = source.with_suffix(".pdf")
         try:
             write_rendered_pdf(model.html(),source,Path(path),css=options.get("css"))
-            status.set("PDF сохранён: "+path)
+            status.set("PDF сохранён: "+str(path))
             webbrowser.open(Path(path).resolve().as_uri())
         except Exception as exc:
             messagebox.showerror("PDF",str(exc),parent=win)
 
+    def edit_header():
+        fields = model.header_fields()
+        if fields is None:
+            return
+        dialog = tk.Toplevel(win)
+        dialog.title("Шапка документа")
+        dialog.transient(win)
+        dialog.columnconfigure(1,weight=1)
+        values = []
+        for i,(label,value) in enumerate(zip(("Название продукта","Версия","Последнее обновление"),fields)):
+            ttk.Label(dialog,text=label,padding=8).grid(row=i,column=0,sticky="w")
+            var = tk.StringVar(value=value)
+            ttk.Entry(dialog,textvariable=var,width=42).grid(row=i,column=1,padx=8,pady=5,sticky="ew")
+            values.append(var)
+        def save():
+            model.set_header(*(v.get() for v in values))
+            status.set("Шапка обновлена")
+            dialog.destroy()
+        ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=8,pady=8)
+        dialog.grab_set()
+        win.wait_window(dialog)
+        win.grab_set()
+    if model.header_fields() is not None:
+        ttk.Button(bar,text="Шапка…",command=edit_header).pack(side="right")
     combo = ttk.Combobox(toolbar,textvariable=selected_style,values=tuple(PARAGRAPH),state="readonly",width=20)
     combo.pack(side="left",padx=(0,8))
     combo.bind("<<ComboboxSelected>>",paragraph)
@@ -172,7 +193,7 @@ def open_editor(parent, source: Path, **options):
     bottom = ttk.Frame(win,padding=12)
     bottom.grid(sticky="ew")
     ttk.Label(bottom,textvariable=status,wraplength=470).pack(side="left")
-    ttk.Button(bottom,text="Экспорт PDF",command=export).pack(side="right")
+    ttk.Button(bottom,text="Создать PDF",command=export).pack(side="right")
     ttk.Label(win,text="Текстовый предпросмотр. Изображения и таблицы сохраняются в PDF; точная вёрстка — в экспортированном файле.",
               padding=(12,0,12,8),wraplength=800).grid(sticky="w")
     text.bind("<ButtonRelease-1>",capture)

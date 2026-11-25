@@ -83,5 +83,5 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release already exists; bump version for new binaries."
           else
-            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file ../docs/RELEASE_0.3.0.md
+            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file "../docs/RELEASE_$version.md"
           fi

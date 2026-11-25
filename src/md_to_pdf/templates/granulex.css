@@ -8,7 +8,7 @@
   @bottom-right { content: counter(page) " / " counter(pages); font: 11px/16px Montserrat, "DejaVu Sans", sans-serif; color: #6b7280; }
   @bottom-center { content: none; }
 }
-body { color: #1f2937; font: 400 10.6667px/16px Montserrat, "DejaVu Sans", sans-serif; padding-inline: 2.6667px; }
+body { color: #1f2937; font: 400 10.6667px/16px Montserrat, "DejaVu Sans", sans-serif; padding-left: 2.6667px; padding-right: 2.6667px; }
 h1,h2,h3,h4,h5,h6 { font-family: Montserrat, "DejaVu Sans", sans-serif; color: #1f2937; font-weight: 700; border: 0; margin: 0 0 16px; }
 h1 { font-size:24px; line-height:32px; }
 h2 { font-size:21.3333px; line-height:29.3333px; }
@@ -38,9 +38,9 @@ img { max-width:100%; height:auto; }
 
 /* First-page header from the supplied Markdown snippet. */
 .doc-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; margin-bottom:16px; break-inside: avoid; break-after: avoid-page; }
-.header-left { display:flex; align-items:center; color:#1f2937; font-size:13.3333px; font-weight:700; flex:1; }
+.header-left { display:flex; align-items:center; color:#1f2937; font-size:13.3333px; font-weight:700; flex:1; min-width:0; }
 .header-left .brand-logo { display:block; width:56px; height:56px; max-width:none; flex:none; margin-right:16px; }
-.header-right { display:flex; flex-direction:column; align-items:flex-end; text-align:right; color:#9ca3af; font-size:10.6667px; line-height:16px; margin-left:16px; }
+.header-right { display:flex; flex-direction:column; align-items:flex-end; text-align:right; color:#9ca3af; font-size:10.6667px; line-height:16px; margin-left:16px; flex:0 0 auto; max-width:55%; }
 .header-right-title { font-weight:700; }
 .header-right-update { margin-top:5.3333px; }
 .header-right span:empty { display:none; }

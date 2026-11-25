@@ -125,8 +125,11 @@ python -m pip install ".[test,gui]"
 python -m unittest discover -s tests -v
 ```
 
-Version 0.3.0. Reconstructed from an incomplete earlier prototype, not a byte-for-byte recovery. License: ISC.
+Version 0.3.1. Reconstructed from an incomplete earlier prototype, not a byte-for-byte recovery. License: ISC.
 
 ### Desktop builds
 
 The [combined workflow](https://github.com/Mixerland1/md-to-pdf/actions/workflows/windows.yml) publishes a release only when Windows and both Mac builds pass. See [platform notes](docs/PLATFORMS.md).
+### Automatic brand metadata (0.3.1)
+
+The Granulex and custom profiles recognize a complete leading Markdown product/version/update block after the first H1 and move it to the header. Leave the GUI metadata fields blank for automatic detection, or fill them to override. See [release notes](docs/RELEASE_0.3.1.md).

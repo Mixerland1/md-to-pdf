@@ -21,7 +21,7 @@ def main():
     except (ImportError, tk.TclError):
         root = tk.Tk()
         drag = False
-    root.title("MD to PDF • 0.3.0")
+    root.title("MD to PDF • 0.3.1")
     root.geometry("820x680")
     root.minsize(690, 590)
     root.columnconfigure(0, weight=1)
@@ -145,9 +145,9 @@ def main():
     brand_fields = ttk.Frame(settings)
     brand_fields.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
     brand_fields.columnconfigure(1, weight=1)
-    for i, (label, var) in enumerate((("Product / Продукт", brand_name),
-                                      ("Version / Версия", brand_version),
-                                      ("Updated / Обновление", brand_updated))):
+    for i, (label, var) in enumerate((("Product / Продукт (auto if empty)", brand_name),
+                                      ("Version / Версия (auto if empty)", brand_version),
+                                      ("Updated / Обновление (auto if empty)", brand_updated))):
         ttk.Label(brand_fields, text=label).grid(row=i, column=0, sticky="w", padx=(0, 8))
         entry = ttk.Entry(brand_fields, textvariable=var)
         entry.grid(row=i, column=1, sticky="ew", pady=2)

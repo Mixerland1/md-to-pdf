@@ -69,6 +69,41 @@ def extract_header(text: str) -> tuple[str, Header]:
     )
 
 
+# Recognize only a complete leading metadata block after the first H1.
+# The update label is mandatory; ambiguous prose remains untouched.
+PLAIN_HEADER = re.compile(
+    r"\A(?:[ \t]*\r?\n)*"
+    r"(?P<h1> {0,3}#[ \t]+[^\r\n]+)\r?\n"
+    r"(?:[ \t]*\r?\n)*"
+    r"(?P<name>[^\W\d_][\w .&+()®™–—-]{0,119}?)"
+    r"[ \t]+(?:(?:версия|version)[ \t]*:?[ \t]+)?[vV]?"
+    r"(?P<version>[0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?)[ \t]*\r?\n"
+    r"(?:[ \t]*\r?\n)*"
+    r"(?:Последнее обновление|Last updated|Last update)[ \t]*:[ \t]*"
+    r"(?P<updated>[\w][\w .,/–—-]{0,99}?)[ \t]*"
+    r"(?=\r?\n[ \t]*(?:\r?\n|\Z)|\Z)",
+    re.IGNORECASE,
+)
+
+
+def extract_document_header(text: str, *, default_name: str = "Granulex",
+                            keep_embedded_name: bool = True) -> tuple[str, Header]:
+    """Extract a known HTML header or a conservative Markdown metadata block."""
+    body, header = extract_header(text)
+    if body != text:
+        if not keep_embedded_name:
+            header = Header(name=default_name, version=header.version, updated=header.updated)
+        return body, header
+    match = PLAIN_HEADER.match(text)
+    if not match:
+        return text, Header(name=default_name)
+    # Leave the heading and every character after the metadata block intact.
+    body = match["h1"] + "\n\n" + text[match.end():].lstrip("\r\n")
+    return body, Header(name=match["name"].strip(),
+                        version="Версия " + match["version"],
+                        updated="Последнее обновление: " + match["updated"].strip())
+
+
 def render_header(header: Header, *, name: str | None = None,
                   version: str | None = None, updated: str | None = None, logo_uri: str | None = None) -> str:
     if logo_uri is None:

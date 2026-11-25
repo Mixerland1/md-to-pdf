@@ -11,7 +11,7 @@ from urllib.parse import urlsplit, unquote
 
 import mistune
 from .inputs import source_html, read_text, MARKDOWN_EXTENSIONS
-from .branding import Header, extract_header, render_header
+from .branding import Header, extract_document_header, render_header
 from .profiles import Profile, load_profile
 from .font_assets import bundled_font_css
 
@@ -49,15 +49,17 @@ def render_html(source: Path, *, title: str | None = None,
         profile.validate()
         template = profile.base
         if source.suffix.lower() in MARKDOWN_EXTENSIONS:
-            text, _ = extract_header(read_text(source))
+            text, header = extract_document_header(read_text(source), default_name=profile.product or profile.name,
+                                                   keep_embedded_name=False)
             content = markdown(text)
         else:
+            header = Header(name=profile.product or profile.name)
             content = source_html(source, markdown)
-        brand = render_header(Header(name=profile.product or profile.name), name=brand_name,
+        brand = render_header(header, name=brand_name,
                               version=brand_version, updated=brand_updated, logo_uri=profile.logo_uri())
     elif template == "granulex":
         if source.suffix.lower() in MARKDOWN_EXTENSIONS:
-            text, header = extract_header(read_text(source))
+            text, header = extract_document_header(read_text(source))
             content = markdown(text)
         else:
             header = Header()
@@ -138,9 +140,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--date", help="Footer date (default: today, DD.MM.YYYY)")
     parser.add_argument("--html-only", action="store_true", help="Export HTML rather than PDF")
     parser.add_argument("--allow-html", action="store_true", help="Allow raw HTML in trusted Markdown (not TXT or DOCX)")
-    parser.add_argument("--brand-name", help="Granulex header product name")
-    parser.add_argument("--brand-version", help="Granulex header product version")
-    parser.add_argument("--brand-updated", help="Granulex header update date/text")
+    parser.add_argument("--brand-name", help="Brand header product name")
+    parser.add_argument("--brand-version", help="Brand header product version")
+    parser.add_argument("--brand-updated", help="Brand header update date/text")
     parser.add_argument("--profile", type=Path, help="Portable brand profile JSON (overrides template)")
     args = parser.parse_args(argv)
     from .batch import collect_sources, plan_outputs

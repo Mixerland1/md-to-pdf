@@ -23,3 +23,6 @@ MD to PDF remains the product name. The goal is local conversion of documents in
 
 ## Workflow
 Separate development branch; review and test changes before integration. Record exact test evidence and known limitations. Use synthetic public fixtures only.
+
+## 0.4.0 priority — Visual editor
+Before expanding the corporate preset library, implement direct selection-based styling as defined in [VISUAL_EDITOR.md](VISUAL_EDITOR.md). Stage 1 range-based semantic model and tests are committed on the separate development branch; GUI integration and release pending. Preserve the quick batch workflow and source files.

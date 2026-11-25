@@ -1,0 +1,1 @@
+{"name":"md-to-pdf-comparison","displayName":"MD to PDF comparison harness","publisher":"local-benchmark","version":"0.0.1","engines":{"vscode":"^1.110.0"},"main":"./test.js","devDependencies":{"@vscode/test-electron":"^2.5.2"},"activationEvents":[]}

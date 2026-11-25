@@ -19,3 +19,7 @@ One interaction: select visible text with the mouse, choose an existing style, s
 
 ## Acceptance
 Select a word in a linked sentence and apply accent; link and remaining text survive. Select multiple paragraphs and choose heading or quote; list/table semantics survive. One undo restores previous output. Apply identical operations to Markdown, TXT, and semantic DOCX. Keep source bytes unchanged. Preview/export must preserve embedded logos and local relative resources. Unsupported structural changes must be explained, never silently flatten content.
+
+## First native editor prototype
+
+Select exactly one queued document, choose the brand template and click Edit document / Редактор. The native text view shows semantic blocks and existing inline styles. Select text, use the paragraph style dropdown or inline style buttons. Undo/redo work on the document snapshot. Export PDF opens a save dialog and opens the generated PDF in the default viewer. The original document is unchanged. Table cells and list items are protected from structural re-tagging; inline styles remain available in the visible text. Image-only blocks and branded headers are preserved in the PDF but not editable in this first text view. Projects and real paginated live preview are not implemented yet. Manual GUI testing is required. 

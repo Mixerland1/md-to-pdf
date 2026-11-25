@@ -104,6 +104,15 @@ def convert(source: Path, output: Path, *, title: str | None = None,
     if html_only:
         output.write_text(html, encoding="utf-8")
         return
+    write_rendered_pdf(html, source, output, css=css)
+
+
+def write_rendered_pdf(html: str, source: Path, output: Path, *, css: Path | None = None) -> None:
+    """Shared PDF writer for conversion and non-destructive document editing."""
+    source, output = source.resolve(), output.resolve()
+    if source == output:
+        raise ValueError("Input and output must be different files")
+    output.parent.mkdir(parents=True, exist_ok=True)
     from weasyprint import HTML
     from weasyprint.urls import URLFetcher
     from urllib.request import url2pathname

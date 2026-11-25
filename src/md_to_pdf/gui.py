@@ -21,7 +21,7 @@ def main():
     except (ImportError, tk.TclError):
         root = tk.Tk()
         drag = False
-    root.title("MD to PDF • 0.3.1")
+    root.title("MD to PDF • 0.4.0 dev")
     root.geometry("820x680")
     root.minsize(690, 590)
     root.columnconfigure(0, weight=1)
@@ -159,6 +159,27 @@ def main():
             brand_fields.grid_remove()
     template.trace_add("write", show_brand)
     show_brand()
+    def open_document_editor():
+        if busy:
+            return
+        chosen = queuebox.curselection()
+        if len(chosen) != 1:
+            messagebox.showinfo("Редактор", "Выберите один документ в списке.", parent=root)
+            return
+        try:
+            from .document_editor import open_editor
+            preset = template.get()
+            profile = load_profile(profiles[preset]) if preset in profiles else None
+            if profile:
+                preset = profile.base
+            custom = Path(css.get().strip()) if css.get().strip() else None
+            open_editor(root, sources[chosen[0]], template=preset, profile=profile, css=custom,
+                        brand_name=brand_name.get().strip() or None,
+                        brand_version=brand_version.get().strip() or None,
+                        brand_updated=brand_updated.get().strip() or None)
+        except Exception as exc:
+            messagebox.showerror("Редактор",str(exc),parent=root)
+    button(tools, "Edit document / Редактор", open_document_editor).pack(side="left",padx=4)
     progress = ttk.Progressbar(panel, mode="determinate")
     progress.grid(row=6, sticky="ew", pady=(12, 4))
     ttk.Label(panel, textvariable=status, wraplength=700).grid(row=7, sticky="w")

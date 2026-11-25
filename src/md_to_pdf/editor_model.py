@@ -16,7 +16,7 @@ EDITOR_CLASSES = {"editor-note", "editor-warning"}
 EDITOR_CSS = """
 .editor-note { border-left: 3px solid #9ca3af; background: #f3f4f6; padding: .7em; }
 .editor-warning { border-left: 3px solid #b50e25; background: #fff1f2; padding: .7em; }
-.brand-accent { color: #b50e25; }
+:where(.brand-accent) { color: #b50e25; }
 """
 
 @dataclass(frozen=True)
@@ -99,6 +99,20 @@ class DocumentEditor:
             locked = n.tag in {"li", "td", "th"} or any(
                 a.tag in {"ul", "ol", "table", "blockquote", "li", "td", "th"} for a in n.iterancestors())
             result.append(Block("".join(n.itertext()), n.tag, role, locked))
+        return result
+
+    def runs(self, index):
+        """Visible inline runs in source order; their concatenation matches block text."""
+        node = self._nodes()[index]
+        result = []
+        for owner, attr, value in _text_slots(node):
+            parent = owner if attr == "text" else owner.getparent()
+            lineage = [parent, *parent.iterancestors()]
+            tags = {el.tag for el in lineage}
+            classes = {cls for el in lineage for cls in (el.get("class") or "").split()}
+            result.append((value, "strong" in tags or "b" in tags,
+                           "em" in tags or "i" in tags, "code" in tags or "pre" in tags,
+                           "brand-accent" in classes))
         return result
 
     def html(self):

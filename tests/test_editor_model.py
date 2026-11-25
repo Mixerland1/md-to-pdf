@@ -39,3 +39,23 @@ class EditorTests(unittest.TestCase):
         self.assertEqual(doc.xpath("//a/@href"), ["https://example.com"])
         self.assertEqual(doc.xpath("//img/@src"), ["media/a.png"])
         self.assertIn("Brand", doc.text_content())
+
+    def test_inline_runs_and_pdf_pipeline(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from md_to_pdf.cli import render_html, write_rendered_pdf
+        from pypdf import PdfReader
+        with TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root/"sample.md"
+            original = "# Heading\n\nAlpha [linked](https://example.com) tail.\n"
+            source.write_text(original,encoding="utf-8")
+            editor = DocumentEditor(render_html(source,template="granulex"))
+            editor.apply("accent",[(1,6,12)])
+            self.assertTrue(any(r[4] and r[0]=="linked" for r in editor.runs(1)))
+            output = root/"edited.pdf"
+            write_rendered_pdf(editor.html(),source,output)
+            page = PdfReader(output).pages[0]
+            self.assertIn("Alpha linked tail.",page.extract_text())
+            self.assertTrue(any(a.get_object().get("/A",{}).get("/URI")=="https://example.com" for a in page["/Annots"]))
+            self.assertEqual(source.read_text(encoding="utf-8"),original)

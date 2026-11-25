@@ -1,6 +1,6 @@
 /* Development preset adapted from the supplied Granulex CSS and A4 export settings.
    Original Chromium scale 1.33333 is approximated by scaled type/spacing;
-   not yet visually approved. No corporate assets are redistributed. */
+   source sizes scaled by 4/3; WeasyPrint is not Chromium. */
 @page {
   size: A4;
   margin: 32px 56px 72px;
@@ -8,7 +8,7 @@
   @bottom-right { content: counter(page) " / " counter(pages); font: 11px/16px Montserrat, "DejaVu Sans", sans-serif; color: #6b7280; }
   @bottom-center { content: none; }
 }
-body { color: #1f2937; font: 400 10.6667px/16px Montserrat, "DejaVu Sans", sans-serif; padding-inline: 2px; }
+body { color: #1f2937; font: 400 10.6667px/16px Montserrat, "DejaVu Sans", sans-serif; padding-inline: 2.6667px; }
 h1,h2,h3,h4,h5,h6 { font-family: Montserrat, "DejaVu Sans", sans-serif; color: #1f2937; font-weight: 700; border: 0; margin: 0 0 16px; }
 h1 { font-size:24px; line-height:32px; }
 h2 { font-size:21.3333px; line-height:29.3333px; }
@@ -16,19 +16,23 @@ h3 { font-size:18.6667px; line-height:26.6667px; }
 h4 { font-size:13.3333px; line-height:21.3333px; }
 h5,h6 { font-size:10.6667px; line-height:16px; }
 p, ul, ol { margin:0 0 16px; }
+li { padding-left:2.6667px; }
+ul { list-style-type:disc; }
+ol { list-style-type:decimal; }
 ul, ol { padding-left: 21.3333px; }
 li ul, li ol { margin-bottom: 0; padding-left: 16px; }
 code { font:400 10.6667px/16px "Roboto Mono", "DejaVu Sans Mono", monospace; }
 p code,li code { color:#b50e25; }
-pre { padding:16px; border-radius:10.6667px; background:#e5e7eb; margin:0 0 16px; }
+pre { padding:16px; border-radius:10.6667px; background:#e5e7eb; margin:0 0 16px; break-inside:avoid-page; border:0; }
 table { border-collapse:separate; border-spacing:0; margin:0 0 16px; }
 th,td { border:0; padding:5.3333px 8px; font:inherit; }
-th { color:#fff; font-weight:700; background:#9ca3af; }
+th { color:#fff; font-weight:700; background:#9ca3af; border:1px solid #9ca3af; }
 td { border-bottom:1px solid #d1d5db; }
 th:first-child,td:first-child { padding-left:16px; }
-blockquote { font:inherit; color:#1f2937; background:#e5e7eb; border-color:#6b7280; padding:16px; margin:0 0 16px; }
+blockquote { font:inherit; color:#1f2937; background:#e5e7eb; border-color:#6b7280; border-radius:0 10.6667px 10.6667px 0; padding:16px; margin:0 0 16px; }
 blockquote p:last-child { margin-bottom:0; }
 a { color:#1a0dab; text-decoration:none; }
+main > p > img:only-child { width:100%; }
 img { max-width:100%; height:auto; }
 .brand-accent { color:#e2112e; }
 

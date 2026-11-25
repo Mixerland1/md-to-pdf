@@ -2,6 +2,8 @@ param([Parameter(Mandatory=$true)][string]$MsysPrefix)
 $ErrorActionPreference = 'Stop'
 $Python = Join-Path $env:pythonLocation 'python.exe'
 if (!(Test-Path $Python)) { throw 'CPython from setup-python not found' }
+& $Python scripts/fetch_fonts.py
+if ($LASTEXITCODE -ne 0) { throw 'Font assets failed verification' }
 & $Python -m pip install '.[build,test]'
 if ($LASTEXITCODE -ne 0) { throw 'Install failed' }
 $env:WEASYPRINT_DLL_DIRECTORIES = Join-Path $MsysPrefix 'bin'

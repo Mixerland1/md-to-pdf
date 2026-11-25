@@ -24,4 +24,4 @@ md-to-pdf = "md_to_pdf.cli:main"
 md-to-pdf-gui = "md_to_pdf.gui:main"
 
 [tool.setuptools.package-data]
-md_to_pdf = ["print.css", "templates/*.css", "templates/*.svg"]
+md_to_pdf = ["print.css", "templates/*.css", "templates/*.svg", "fonts/*.ttf", "fonts/*-OFL.txt"]

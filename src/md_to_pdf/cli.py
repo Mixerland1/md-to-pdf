@@ -13,6 +13,7 @@ import mistune
 from .inputs import source_html, read_text, MARKDOWN_EXTENSIONS
 from .branding import Header, extract_header, render_header
 from .profiles import Profile, load_profile
+from .font_assets import bundled_font_css
 
 TEMPLATES = ('technical', 'business', 'academic', 'granulex')
 
@@ -70,6 +71,8 @@ def render_html(source: Path, *, title: str | None = None,
     style += "\n" + Path(__file__).with_name("templates").joinpath(template + ".css").read_text(encoding="utf-8")
     if profile is not None:
         style += "\n" + profile.css()
+    if template == "granulex" or profile is not None:
+        style = bundled_font_css() + "\n" + style
     # A linked custom stylesheet retains its own base URL for relative assets.
     custom = f'<link rel="stylesheet" href="{escape(css.resolve().as_uri(), quote=True)}">' if css else ""
     return f'''<!doctype html>

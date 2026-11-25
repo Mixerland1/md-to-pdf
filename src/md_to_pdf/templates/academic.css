@@ -1,0 +1,10 @@
+/* Academic paper */
+@page { margin: 23mm 24mm 23mm; }
+body { font-family: "Times New Roman", "DejaVu Serif", serif; font-size: 12pt; line-height: 1.5; }
+main > h1:first-child { text-align: center; font-size: 22pt; }
+h2 { font-size: 16pt; }
+h3 { font-size: 13pt; }
+p { text-align: justify; }
+a { color: #222; }
+th { background: #eee; }
+pre { background: #f4f4f4; }

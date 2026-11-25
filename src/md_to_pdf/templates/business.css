@@ -1,0 +1,10 @@
+/* Business report */
+@page { margin: 22mm 20mm 23mm; }
+body { font-family: Arial, "DejaVu Sans", sans-serif; font-size: 11pt; line-height: 1.5; }
+h1 { color: #172b47; font-size: 27pt; border-bottom: 2pt solid #bc9659; padding-bottom: 9pt; }
+h2 { color: #172b47; font-size: 18pt; }
+h3 { color: #42516b; }
+th { background: #172b47; color: white; }
+td, th { border-color: #d8dce3; }
+blockquote { border-color: #bc9659; }
+a { color: #254b83; }

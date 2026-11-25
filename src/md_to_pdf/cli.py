@@ -11,6 +11,8 @@ from urllib.parse import urlsplit, unquote
 
 import mistune
 
+TEMPLATES = ('technical', 'business', 'academic')
+
 
 class DocumentRenderer(mistune.HTMLRenderer):
     def __init__(self, *, allow_html: bool = False):
@@ -30,7 +32,7 @@ class DocumentRenderer(mistune.HTMLRenderer):
 
 def render_html(source: Path, *, title: str | None = None,
                 document_date: str | None = None, css: Path | None = None,
-                allow_html: bool = False) -> str:
+                allow_html: bool = False, template: str = 'technical') -> str:
     source = source.resolve()
     title = title or source.stem
     document_date = document_date or date.today().strftime("%d.%m.%Y")
@@ -38,6 +40,9 @@ def render_html(source: Path, *, title: str | None = None,
                                       plugins=["table", "strikethrough", "task_lists", "footnotes", "url"])
     content = markdown(source.read_text(encoding="utf-8-sig"))
     style = Path(__file__).with_name("print.css").read_text(encoding="utf-8")
+    if template not in TEMPLATES:
+        raise ValueError(f"Unknown template: {template}")
+    style += "\n" + Path(__file__).with_name("templates").joinpath(template + ".css").read_text(encoding="utf-8")
     # A linked custom stylesheet retains its own base URL for relative assets.
     custom = f'<link rel="stylesheet" href="{escape(css.resolve().as_uri(), quote=True)}">' if css else ""
     return f'''<!doctype html>
@@ -52,14 +57,14 @@ def render_html(source: Path, *, title: str | None = None,
 
 def convert(source: Path, output: Path, *, title: str | None = None,
             document_date: str | None = None, css: Path | None = None,
-            allow_html: bool = False, html_only: bool = False) -> None:
+            allow_html: bool = False, html_only: bool = False, template: str = 'technical') -> None:
     source, output = source.resolve(), output.resolve()
     if source == output:
         raise ValueError("Input and output must be different files")
     if css and not css.is_file():
         raise FileNotFoundError(css)
     html = render_html(source, title=title, document_date=document_date,
-                       css=css, allow_html=allow_html)
+                       css=css, allow_html=allow_html, template=template)
     output.parent.mkdir(parents=True, exist_ok=True)
     if html_only:
         output.write_text(html, encoding="utf-8")
@@ -89,7 +94,11 @@ def convert(source: Path, output: Path, *, title: str | None = None,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path, help="Input Markdown file")
+    parser.add_argument("source", type=Path, nargs="+", help="Markdown files or folders")
+    parser.add_argument("--recursive", action="store_true", help="Include subfolders")
+    parser.add_argument("--output-dir", type=Path, help="Output folder for batch conversion")
+    parser.add_argument("--overwrite", action="store_true", help="Allow replacing existing outputs")
+    parser.add_argument("--template", choices=TEMPLATES, default="technical")
     parser.add_argument("-o", "--output", type=Path, help="Output path (default: next to input)")
     parser.add_argument("--css", type=Path, help="Additional print stylesheet")
     parser.add_argument("--title", help="Document title (default: filename without extension)")
@@ -97,15 +106,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--html-only", action="store_true", help="Export HTML rather than PDF")
     parser.add_argument("--allow-html", action="store_true", help="Allow raw HTML in trusted Markdown")
     args = parser.parse_args(argv)
-    output = args.output or args.source.with_suffix(".html" if args.html_only else ".pdf")
+    from .batch import collect_sources, plan_outputs
     try:
-        convert(args.source, output, title=args.title, document_date=args.date,
-                css=args.css, allow_html=args.allow_html, html_only=args.html_only)
-    except Exception as exc:
+        sources = collect_sources(args.source, recursive=args.recursive)
+        if args.output and (len(sources) != 1 or args.output_dir):
+            raise ValueError("-o requires exactly one input and cannot be combined with --output-dir")
+        jobs = plan_outputs(sources, output_dir=args.output_dir, explicit=args.output,
+                            html_only=args.html_only, overwrite=args.overwrite)
+    except (OSError, ValueError) as exc:
         print(f"md-to-pdf: {exc}", file=sys.stderr)
         return 1
-    print(f"Wrote {output.resolve()}")
-    return 0
+    failures = 0
+    for source, output in jobs:
+        try:
+            convert(source, output, title=args.title, document_date=args.date,
+                    css=args.css, allow_html=args.allow_html, html_only=args.html_only,
+                    template=args.template)
+            print(f"Wrote {output.resolve()}")
+        except Exception as exc:
+            failures += 1
+            print(f"{source}: {exc}", file=sys.stderr)
+    return int(failures != 0)
 
 
 if __name__ == "__main__":

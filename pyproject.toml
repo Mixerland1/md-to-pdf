@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "md-to-pdf"
-version = "0.1.0"
+version = "0.2.0"
 description = "Standalone Markdown-to-PDF converter for technical documents"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,9 +13,15 @@ dependencies = ["mistune>=3.2,<4", "weasyprint>=68,<69"]
 
 [project.optional-dependencies]
 test = ["pypdf>=5,<7"]
+gui = ["tkinterdnd2>=0.4,<1"]
+build = ["tkinterdnd2>=0.4,<1", "pyinstaller>=6.11,<7"]
+
 
 [project.scripts]
 md-to-pdf = "md_to_pdf.cli:main"
 
+[project.gui-scripts]
+md-to-pdf-gui = "md_to_pdf.gui:main"
+
 [tool.setuptools.package-data]
-md_to_pdf = ["print.css"]
+md_to_pdf = ["print.css", "templates/*.css"]

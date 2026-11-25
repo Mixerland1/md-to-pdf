@@ -1,0 +1,54 @@
+name: Windows portable build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['src/**', 'packaging/**', 'pyproject.toml', '.github/workflows/windows.yml']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-pango mingw-w64-ucrt-x86_64-libffi
+      - shell: msys2 {0}
+        run: echo "MSYS_PREFIX=$(cygpath -w /ucrt64)" >> "$GITHUB_ENV"
+      - shell: pwsh
+        run: ./packaging/build_windows.ps1 -MsysPrefix $env:MSYS_PREFIX
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MD-to-PDF-Windows-x64
+          path: MD-to-PDF-Windows-x64.zip
+          if-no-files-found: error
+  # Publishing is separate from build: only a smoke-tested bundle can be released.
+  publish:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MD-to-PDF-Windows-x64
+      - name: Publish tested release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml)
+          tag="v$version"
+          sha256sum MD-to-PDF-Windows-x64.zip > SHA256SUMS.txt
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release already exists; bump version for new binaries."
+          else
+            gh release create "$tag" MD-to-PDF-Windows-x64.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --generate-notes
+          fi

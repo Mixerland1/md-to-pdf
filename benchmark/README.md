@@ -28,4 +28,17 @@ Manual reproduction with VS Code 1.110.0 and extension 2.2.0:
 
 The script measures extracted-text markers, external link annotation, internal destination, page count, PDF file size and raster image count. Embedded SVGs may be vector graphics and are not covered by the raster-image count. Visual review remains necessary. The script does not assign an overall winner.
 
-Status: no head-to-head results are claimed until a successful comparison run produces the artifact.
+## Measured results — 2026-11-25
+
+[Successful run and logs](https://github.com/Mixerland1/md-to-pdf/actions/runs/45614647919), commit `e9e125c11f7e7b09ad1c43ef88d250fc97296dd1`. Linux x86-64, MD to PDF 0.2.0, VS Code 1.110.0, Markdown PDF 2.2.0. Median of three conversions (one cold and two subsequent).
+
+| Fixture | MD to PDF (ms) | VS Code (ms) | Speed ratio | MD to PDF (bytes) | VS Code (bytes) |
+|---|---:|---:|---:|---:|---:|
+| guide | 388.38 | 2601.97 | 6.70x | 15321 | 36845 |
+| long | 473.01 | 3042.46 | 6.43x | 14726 | 33767 |
+| unicode | 332.05 | 3053.31 | 9.20x | 10602 | 20006 |
+
+Both preserved all seven expected text markers. Both preserved the tested internal link and one raster image in guide. The inspection found the expected external URI in MD to PDF but not in the extension output; this is a fixture-specific observation, not proof that the extension cannot export external links. Page counts were 1/6/1 versus 1/5/1. Visual layout has not yet been independently scored.
+
+[Download the original result JSON and PDFs](https://github.com/Mixerland1/md-to-pdf/actions/runs/45614647919/artifacts/15022335275) (GitHub login may be required; temporary artifact). These results reflect only the tested fixtures, settings, and runner, not general superiority or Windows performance.
+

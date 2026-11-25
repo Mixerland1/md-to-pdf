@@ -52,6 +52,11 @@ def main():
     banner.pack(fill="x")
     bar=ttk.Frame(chrome,padding=(10,6),style="Toolbar.TFrame")
     bar.pack(fill="x")
+    bar.columnconfigure(1,weight=1)
+    left_tools=ttk.Frame(bar,style="Toolbar.TFrame")
+    right_tools=ttk.Frame(bar,style="Toolbar.TFrame")
+    left_tools.grid(row=0,column=0,sticky="w")
+    right_tools.grid(row=0,column=2,sticky="e")
     def options():
         key=preset.get()
         p=load_profile(profiles[key]) if key in profiles else None
@@ -64,7 +69,7 @@ def main():
         name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx")])
         if name:
             load(name)
-    open_button=ttk.Button(bar,text="Открыть",command=choose,style="Toolbar.TButton")
+    open_button=ttk.Button(left_tools,text="Открыть",command=choose,style="Toolbar.TButton")
     editor_bar=ttk.Frame(bar,style="Toolbar.TFrame")
     combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles),state="readonly",width=17,style="Toolbar.TCombobox")
     combo.pack(side="left",padx=(8,2))
@@ -110,13 +115,13 @@ def main():
         widget.bind("<ButtonPress>",hide,add="+")
     tooltip(brush_button,"Формат по образцу")
     brush_button.pack(side="left",padx=(0,4))
-    editor_paste=ttk.Button(bar,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
-    save_button=ttk.Button(bar,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
+    editor_paste=ttk.Button(left_tools,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
+    save_button=ttk.Button(right_tools,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
 
     ttk.Button(editor_bar,text="↶",width=3,style="Toolbar.TButton",command=lambda:history(False)).pack(side="left")
     ttk.Button(editor_bar,text="↷",width=3,style="Toolbar.TButton",command=lambda:history(True)).pack(side="left",padx=(2,0))
-    export_button=ttk.Button(bar,text="Экспорт PDF",command=lambda:export(),style="Accent.TButton")
-    update_button=ttk.Button(bar,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
+    export_button=ttk.Button(right_tools,text="Экспорт PDF",command=lambda:export(),style="Accent.TButton")
+    update_button=ttk.Button(right_tools,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
     empty=Backdrop(root,"welcome.webp")
     empty.grid(row=1,sticky="nsew")
     welcome=ttk.Frame(empty,padding=(26,22),style="Welcome.TFrame")
@@ -235,21 +240,32 @@ def main():
         paste(fresh=True)
         return "break"
 
+    def arrange_toolbar(_=None):
+        if state["workspace"] is None:
+            return
+        need=left_tools.winfo_reqwidth()+editor_bar.winfo_reqwidth()+right_tools.winfo_reqwidth()+30
+        if root.winfo_width()>=need:
+            editor_bar.grid(row=0,column=1,columnspan=1,sticky="w")
+        else:
+            editor_bar.grid(row=1,column=0,columnspan=3,sticky="w",pady=(5,0))
+
+    bar.bind("<Configure>",arrange_toolbar)
+
     def show_workspace(ws,pasted):
         state.update(workspace=ws,dirty=pasted,pasted=pasted,paste_pdf=None,result=None,
                      selection=[],brush=None,restore_selection=[])
-        brush_button.configure(style="Toolbar.TButton")
+        cancel_brush()
         update_fields()
         empty.grid_remove()
         chrome.grid(row=0,sticky="ew")
         if not open_button.winfo_manager():
-            open_button.pack(side="left",before=editor_bar) if editor_bar.winfo_manager() else open_button.pack(side="left")
+            open_button.pack(side="left")
         if not editor_paste.winfo_manager():
             editor_paste.pack(side="left",padx=(4,0))
         editor_paste.configure(text="Изменить текст" if pasted else "Вставить текст")
-        editor_bar.pack(side="left")
         export_button.pack(side="right")
         save_button.pack(side="right",padx=4)
+        arrange_toolbar()
         preview.grid(row=1,sticky="nsew")
         render()
     def select(ranges):
@@ -263,8 +279,7 @@ def main():
             message()
             if ranges and state["brush"]:
                 copied=state["brush"]
-                state["brush"]=None
-                brush_button.configure(text="Кисть")
+                cancel_brush()
                 apply_values(copied)
 
     def display_family(value):
@@ -386,6 +401,7 @@ def main():
                 ws.save_pasted(name,preset.get())
                 state["pasted"]=False
                 editor_paste.configure(text="Вставить текст")
+                arrange_toolbar()
                 state["paste_pdf"]=None
                 state["dirty"]=False
                 render(preserve=True)
@@ -518,6 +534,7 @@ def main():
                     update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
                     chrome.grid(row=0,sticky="ew")
                     update_button.pack(side="right",padx=6)
+                    arrange_toolbar()
                 elif kind=="update-exit":
                     preview.close()
                     root.destroy()

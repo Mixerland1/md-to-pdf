@@ -27,6 +27,51 @@ STYLES={"Текст":"normal","Заголовок 1":"h1","Заголовок 2"
         "Ячейка таблицы":"table-cell","Заголовок таблицы":"table-heading",
         "Полужирный":"bold","Курсив":"italic","Код":"code","Акцент":"accent"}
 
+def ask_save_changes(parent):
+    """Return save, discard or cancel; Escape and the window close mean cancel."""
+    result="cancel"
+    dialog=tk.Toplevel(parent)
+    dialog.title("MD to PDF")
+    dialog.transient(parent)
+    dialog.resizable(False,False)
+    frame=ttk.Frame(dialog,padding=20)
+    frame.pack(fill="both",expand=True)
+    ttk.Label(frame,text="Сохранить изменения?",font=("TkDefaultFont",12,"bold")).pack(anchor="w",pady=(0,16))
+    actions=ttk.Frame(frame)
+    actions.pack(fill="x")
+    def finish(value):
+        nonlocal result
+        result=value
+        dialog.destroy()
+    primary=ttk.Button(actions,text="Сохранить",style="Accent.TButton",command=lambda:finish("save"))
+    primary.pack(side="left")
+    ttk.Button(actions,text="Не сохранять",command=lambda:finish("discard")).pack(side="left",padx=8)
+    ttk.Button(actions,text="Отмена",command=lambda:finish("cancel")).pack(side="left")
+    dialog.protocol("WM_DELETE_WINDOW",lambda:finish("cancel"))
+    dialog.bind("<Escape>",lambda e:finish("cancel"))
+    dialog.bind("<Return>",lambda e:finish("save"))
+    dialog.update_idletasks()
+    x=parent.winfo_rootx()+(parent.winfo_width()-dialog.winfo_reqwidth())//2
+    y=parent.winfo_rooty()+(parent.winfo_height()-dialog.winfo_reqheight())//2
+    dialog.geometry(f"+{max(0,x)}+{max(0,y)}")
+    previous=parent.grab_current()
+    dialog.grab_set()
+    primary.focus_set()
+    parent.wait_window(dialog)
+    if previous is not None and previous.winfo_exists():
+        previous.grab_set()
+    return result
+
+
+def confirm_changes(parent, dirty, save_callback):
+    if not dirty:
+        return True
+    answer=ask_save_changes(parent)
+    if answer=="save":
+        return bool(save_callback())
+    return answer=="discard"
+
+
 def main():
     try:
         from tkinterdnd2 import TkinterDnD,DND_FILES
@@ -66,8 +111,9 @@ def main():
         if key not in BUILTINS and p is None:
             return state["workspace"].options if state["workspace"] else dict(template="technical",profile=None)
         return dict(template=p.base if p else BUILTINS[key],profile=p)
-    def discard_ok():
-        return not state["dirty"] or messagebox.askyesno("MD to PDF","Открыть другой документ без сохранения изменений?",parent=root)
+    def discard_ok(parent=None):
+        owner=parent or root
+        return confirm_changes(owner,state["dirty"],lambda:save(parent=owner,reflow=False))
     def choose():
         name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx")])
         if name:
@@ -218,9 +264,8 @@ def main():
             if current_text is not None and value==current_text:
                 dialog.destroy()
                 return
-            if previous and (state["dirty"] or previous.actions):
-                if not messagebox.askyesno("Заменить документ","Заменить текст? Правки оформления текущего документа не переносятся.",parent=dialog):
-                    return
+            if previous and not discard_ok(dialog):
+                return
             try:
                 ws=Workspace.from_clipboard(value,clipboard_dir.name,**options())
             except Exception as exc:
@@ -401,30 +446,34 @@ def main():
         brush_button.configure(style="Accent.TButton")
         preview.canvas.configure(cursor="crosshair")
         message("Формат по образцу: выберите другой фрагмент.")
-    def save():
+    def save(parent=None,reflow=True):
         if not state["workspace"] or state["updating"]:
-            return
+            return False
+        owner=parent or root
         try:
             ws=state["workspace"]
             if state["pasted"]:
-                name=filedialog.asksaveasfilename(parent=root,defaultextension=".md",
+                name=filedialog.asksaveasfilename(parent=owner,defaultextension=".md",
                      initialfile="Документ.md",filetypes=[("Markdown","*.md")])
                 if not name:
-                    return
+                    return False
                 ws.save_pasted(name,preset.get())
                 state["pasted"]=False
                 editor_paste.configure(text="Вставить текст")
                 arrange_toolbar()
                 state["paste_pdf"]=None
                 state["dirty"]=False
-                render(preserve=True)
+                if reflow:
+                    render(preserve=True)
             else:
                 ws.save(preset.get())
                 state["dirty"]=False
             message("Правки сохранены")
             root.after(1800,lambda:message() if status.get()=="Правки сохранены" else None)
+            return True
         except Exception as exc:
-            messagebox.showerror("Сохранение",str(exc),parent=root)
+            messagebox.showerror("Сохранение",str(exc),parent=owner)
+            return False
     def history(redo):
         ws=state["workspace"]
         if ws and not state["updating"] and (ws.redo() if redo else ws.undo()):
@@ -550,7 +599,9 @@ def main():
         if sys.platform!="win32":
             webbrowser.open(release.url)
             return
-        if not messagebox.askyesno("Обновление","Обновить программу и перезапустить?"+("\nНесохранённые изменения будут потеряны." if state["dirty"] else ""),parent=root):
+        if not messagebox.askyesno("Обновление","Обновить программу и перезапустить?",parent=root):
+            return
+        if not discard_ok():
             return
         state["updating"]=True
         message("Загрузка обновления…")
@@ -606,7 +657,7 @@ def main():
     def close():
         if state["updating"]:
             return
-        if state["dirty"] and not messagebox.askyesno("MD to PDF","Закрыть без сохранения изменений?",parent=root):
+        if not discard_ok():
             return
         preview.close()
         root.destroy()

@@ -25,3 +25,5 @@ Paste dialog supports inspection, editing, refilling, cancellation and reopening
 Beta 7: format-by-sample mode clears after application; toolbar adapts to width without hiding export/save.
 
 Beta 8: Version and Last updated are explicit fragment roles; branded presets assign complete paragraphs to empty right header fields. Existing table cells expose Cell and Table heading roles; contextual Table parameters provides width, position, and borders. No permanent extra toolbar button.
+
+Beta 9: consistent three-choice save confirmation before discarding unsaved work. Save must complete successfully; cancelled save or error leaves the editor open. Clean documents require no confirmation.

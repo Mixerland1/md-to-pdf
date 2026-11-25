@@ -95,6 +95,13 @@ try:
                 buttons(root)["Сохранить"].invoke()
             assert (Path(d)/"clipboard.md").is_file()
             assert (Path(d)/"clipboard.md.mdtopdf").is_file()
+            # The confirmation itself uses the actual three-button dialog.
+            for label,expected in (("Сохранить","save"),("Не сохранять","discard"),("Отмена","cancel")):
+                def answer():
+                    prompt=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
+                    buttons(prompt)[label].invoke()
+                root.after(100,answer)
+                assert gui.ask_save_changes(root)==expected
             preview.close()
     print("GUI smoke: one window, real PDF preview and export PASS")
 finally:

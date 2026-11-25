@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md-to-pdf"
+version = "0.1.0"
+description = "Standalone Markdown-to-PDF converter for technical documents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "ISC"}
+dependencies = ["mistune>=3.2,<4", "weasyprint>=68,<69"]
+
+[project.optional-dependencies]
+test = ["pypdf>=5,<7"]
+
+[project.scripts]
+md-to-pdf = "md_to_pdf.cli:main"
+
+[tool.setuptools.package-data]
+md_to_pdf = ["print.css"]

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="86" viewBox="0 0 620 86">
+  <g fill="#eef1f4" stroke="#aab4c0"><rect x="8" y="10" width="170" height="64" rx="6"/><rect x="225" y="10" width="170" height="64" rx="6"/><rect x="442" y="10" width="170" height="64" rx="6"/></g>
+  <g fill="#25374a" font-family="sans-serif" font-size="20" text-anchor="middle"><text x="93" y="49">Markdown</text><text x="310" y="49">HTML</text><text x="527" y="49">PDF</text></g>
+  <g fill="none" stroke="#526d86" stroke-width="2"><path d="M182 42H220m-8 -7 8 7 -8 7M399 42H437m-8 -7 8 7 -8 7"/></g>
+</svg>

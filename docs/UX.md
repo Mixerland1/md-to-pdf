@@ -15,3 +15,6 @@ Single document only: open/drop, inline preset selector and contextual style sel
 
 ## Beta 3 selection
 Click selects semantic block; drag selects characters with adjustable endpoints; merged blue line highlights. Current role, font, size shown; mixed state per control. Reflow restores selection. Font and point size overrides; one-shot brush for a uniform style. Save persists source-bound sidecar, Export PDF remains separate. No extra formatting ribbon. Manual visual acceptance pending.
+
+## Beta 5 — welcome artwork and paste
+The welcome screen uses the selected first blue/white wave artwork; the header uses a crop of the approved toolbar mockup without its fake controls. Both assets are bundled in compressed WebP; the title bar remains native. Welcome offers Open and Paste text, and drag/drop. Ctrl+V (Command+V on Mac) imports clipboard text as Markdown unless editing a text input. Pasted documents use a private temporary workspace; initial export chooses PDF, initial save writes a new Markdown source plus sidecar. Existing source documents never get overwritten. No extra update button: only show an available update detected at startup.

@@ -96,6 +96,45 @@ class Workspace:
     def project_path(self):
         return self.source.with_name(self.source.name+".mdtopdf")
 
+    @classmethod
+    def from_clipboard(cls, text, directory, **options):
+        if not isinstance(text,str) or not text.strip():
+            raise ValueError("В буфере обмена нет текста")
+        if len(text.encode("utf-8"))>8_000_000:
+            raise ValueError("Слишком большой текст")
+        # Use a private, per-document folder. No clipboard data is sent online.
+        folder=Path(tempfile.mkdtemp(prefix="clipboard-",dir=directory))
+        source=folder/"Без названия.md"
+        source.write_bytes(text.encode("utf-8"))
+        return cls(source,**options)
+
+    def save_pasted(self, target, label):
+        target=Path(target).resolve()
+        if target.suffix.lower()!=".md":
+            raise ValueError("Сохраните текст как Markdown (.md)")
+        sidecar=target.with_name(target.name+".mdtopdf")
+        if target.exists() or sidecar.exists():
+            raise FileExistsError("Выберите новое имя: исходные файлы не перезаписываются")
+        previous=self.source
+        previous_model=self.model
+        previous_skipped=self.skipped
+        created=False
+        try:
+            with target.open("xb") as stream:
+                created=True
+                stream.write(previous.read_bytes())
+            self.source=target
+            self._rebuild(self.options)
+            self.save(label)
+        except Exception:
+            self.source=previous
+            self.model=previous_model
+            self.skipped=previous_skipped
+            if created:
+                target.unlink(missing_ok=True)
+            raise
+        return target
+
     def save(self, label):
         if hashlib.sha256(self.source.read_bytes()).hexdigest()!=self.source_hash:
             raise ValueError("Исходный файл изменился. Откройте его заново.")
@@ -165,6 +204,12 @@ def export_bytes(source, data):
     target = Path(source).with_suffix(".pdf").resolve()
     if target == Path(source).resolve():
         raise ValueError("Нельзя заменить исходный документ")
+    return write_pdf_bytes(target,data)
+
+def write_pdf_bytes(target,data):
+    target=Path(target).resolve()
+    if target.suffix.lower()!=".pdf":
+        raise ValueError("Выберите файл PDF")
     with tempfile.NamedTemporaryFile(dir=target.parent,suffix=".pdf",delete=False) as out:
         temporary = Path(out.name)
         try:

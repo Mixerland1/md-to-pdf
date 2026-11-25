@@ -94,7 +94,7 @@ class PagePreview(ttk.Frame):
         super().__init__(parent)
         self.columnconfigure(0,weight=1)
         self.rowconfigure(0,weight=1)
-        self.canvas=tk.Canvas(self,bg="#e7e9ed",highlightthickness=0)
+        self.canvas=tk.Canvas(self,bg="#e7edf6",highlightthickness=0)
         self.canvas.grid(sticky="nsew")
         self.scroll=ttk.Scrollbar(self,orient="vertical",command=self._scroll)
         self.scroll.grid(row=0,column=1,sticky="ns")
@@ -174,7 +174,7 @@ class PagePreview(ttk.Frame):
             w,h=w*self.scale,h*self.scale
             x=max(12,(width-w)/2)
             self.page_boxes.append((x,y,w,h))
-            self.canvas.create_rectangle(x,y,x+w,y+h,fill="white",outline="#d0d3d8")
+            self.canvas.create_rectangle(x,y,x+w,y+h,fill="white",outline="#c5d0df")
             y+=h+20
         self.canvas.configure(scrollregion=(0,0,width,y))
         self._draw_selection()

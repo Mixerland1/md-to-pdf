@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from md_to_pdf import gui
 from md_to_pdf.page_preview import PagePreview
+from md_to_pdf.ui_skin import Backdrop
 
 def descendants(widget):
     for child in widget.winfo_children():
@@ -25,6 +26,8 @@ try:
             gui.main()
             root.update()
             assert not any(isinstance(w,tk.Listbox) for w in descendants(root))
+            assert any(isinstance(w,Backdrop) and w.original is not None for w in descendants(root))
+            assert "Вставить текст" in buttons(root)
             buttons(root)["Открыть"].invoke()
             deadline=time.monotonic()+30
             preview=next(w for w in descendants(root) if isinstance(w,PagePreview))
@@ -57,6 +60,21 @@ try:
             buttons(root)["Экспорт PDF"].invoke()
             assert source.with_suffix(".pdf").is_file()
             assert len(preview.page_boxes)>0
+            root.clipboard_clear()
+            root.clipboard_append("# Из буфера\n\nНовый текст.")
+            buttons(root)["Вставить текст"].invoke()
+            deadline=time.monotonic()+30
+            while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
+                root.update()
+                time.sleep(.05)
+            assert any("Новый" in t for t in ["".join(g.char for g in preview.glyphs)]),"Pasted text missing"
+            with patch.object(gui.filedialog,"asksaveasfilename",return_value=str(Path(d)/"clipboard.pdf")):
+                buttons(root)["Экспорт PDF"].invoke()
+            assert (Path(d)/"clipboard.pdf").is_file()
+            with patch.object(gui.filedialog,"asksaveasfilename",return_value=str(Path(d)/"clipboard.md")):
+                buttons(root)["Сохранить"].invoke()
+            assert (Path(d)/"clipboard.md").is_file()
+            assert (Path(d)/"clipboard.md.mdtopdf").is_file()
             preview.close()
     print("GUI smoke: one window, real PDF preview and export PASS")
 finally:

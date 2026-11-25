@@ -49,3 +49,24 @@ class WorkspaceTests(unittest.TestCase):
             p.write_text("Changed",encoding="utf-8")
             with self.assertRaises(ValueError):
                 Workspace(p,template="granulex").restore()
+
+    def test_clipboard_save_and_export(self):
+        from md_to_pdf.workspace import write_pdf_bytes
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            w=Workspace.from_clipboard("# Заголовок\n\nВставленный **текст**.",root,template="granulex")
+            self.assertEqual(w.model.blocks()[0].text,"Заголовок")
+            self.assertEqual(w.model.blocks()[1].text,"Вставленный текст.")
+            w.apply("h2",[(1,0,4)])
+            data=render_snapshot(w.snapshot())[0]
+            self.assertEqual(write_pdf_bytes(root/"pasted.pdf",data).read_bytes(),data)
+            target=root/"saved.md"
+            w.save_pasted(target,"Granulex")
+            self.assertEqual(target.read_text(encoding="utf-8"),"# Заголовок\n\nВставленный **текст**.")
+            reopened=Workspace(target,template="technical")
+            self.assertEqual(reopened.restore(),"Granulex")
+            self.assertEqual(reopened.model.blocks()[1].role,"h2")
+            with self.assertRaises(FileExistsError):
+                w.save_pasted(target,"Granulex")
+            with self.assertRaises(ValueError):
+                Workspace.from_clipboard(" \n",root,template="technical")

@@ -4,6 +4,7 @@ import queue
 import re
 import sys
 import threading
+import tempfile
 import webbrowser
 from pathlib import Path
 import tkinter as tk
@@ -13,7 +14,8 @@ from . import __version__
 from .inputs import EXTENSIONS
 from .profiles import load_profile,list_profiles
 from .profile_editor import manage_profiles
-from .workspace import Workspace,render_snapshot,export_bytes
+from .workspace import Workspace,render_snapshot,export_bytes,write_pdf_bytes
+from .ui_skin import Backdrop,configure_theme,SURFACE,INK
 from .page_preview import PagePreview
 
 BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex"}
@@ -29,6 +31,8 @@ def main():
     except (ImportError,tk.TclError):
         root=tk.Tk()
         drag=False
+    configure_theme(root)
+    clipboard_dir=tempfile.TemporaryDirectory(prefix="md-to-pdf-clipboard-")
     root.title("MD to PDF • "+__version__)
     root.geometry("1200x820")
     root.minsize(1020,480)
@@ -36,14 +40,17 @@ def main():
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
     state={"workspace":None,"result":None,"generation":0,"rendering":False,
-           "dirty":False,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
+           "dirty":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
     profiles=list_profiles()
     preset=tk.StringVar(value="Технический")
     role=tk.StringVar(value="Стиль фрагмента")
     font=tk.StringVar(value="Шрифт")
     size=tk.StringVar(value="pt")
-    bar=ttk.Frame(root,padding=(10,8))
-    bar.grid(row=0,sticky="ew")
+    chrome=ttk.Frame(root,style="Toolbar.TFrame")
+    banner=Backdrop(chrome,"toolbar.webp",banner=True,height=23)
+    banner.pack(fill="x")
+    bar=ttk.Frame(chrome,padding=(10,6),style="Toolbar.TFrame")
+    bar.pack(fill="x")
     def options():
         key=preset.get()
         p=load_profile(profiles[key]) if key in profiles else None
@@ -56,10 +63,9 @@ def main():
         name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx")])
         if name:
             load(name)
-    open_button=ttk.Button(bar,text="Открыть",command=choose)
-    open_button.pack(side="left")
-    editor_bar=ttk.Frame(bar)
-    combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles),state="readonly",width=17)
+    open_button=ttk.Button(bar,text="Открыть",command=choose,style="Toolbar.TButton")
+    editor_bar=ttk.Frame(bar,style="Toolbar.TFrame")
+    combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles),state="readonly",width=17,style="Toolbar.TCombobox")
     combo.pack(side="left",padx=(8,2))
     def refresh_profiles(path=None):
         nonlocal profiles
@@ -70,28 +76,35 @@ def main():
             if label:
                 preset.set(label)
                 switch()
-    ttk.Button(editor_bar,text="⚙",width=3,command=lambda:manage_profiles(root,selected=preset.get(),builtins=BUILTINS,on_change=refresh_profiles)).pack(side="left",padx=(0,6))
-    styles=ttk.Combobox(editor_bar,textvariable=role,values=tuple(STYLES),state="readonly",width=19)
+    ttk.Button(editor_bar,text="⚙",width=3,style="Toolbar.TButton",command=lambda:manage_profiles(root,selected=preset.get(),builtins=BUILTINS,on_change=refresh_profiles)).pack(side="left",padx=(0,6))
+    styles=ttk.Combobox(editor_bar,textvariable=role,values=tuple(STYLES),state="readonly",width=19,style="Toolbar.TCombobox")
     styles.pack(side="left",padx=(0,4))
     fonts=sorted(set(tkfont.families(root))|{"Montserrat","Roboto Mono","Arial","Times New Roman","DejaVu Sans"},key=str.casefold)
-    font_box=ttk.Combobox(editor_bar,textvariable=font,values=tuple(f for f in fonts if not f.startswith("@")),width=17)
+    font_box=ttk.Combobox(editor_bar,textvariable=font,values=tuple(f for f in fonts if not f.startswith("@")),width=17,style="Toolbar.TCombobox")
     font_box.pack(side="left",padx=(0,3))
-    size_box=ttk.Combobox(editor_bar,textvariable=size,values=("6","7","8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"),width=5)
+    size_box=ttk.Combobox(editor_bar,textvariable=size,values=("6","7","8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"),width=5,style="Toolbar.TCombobox")
     size_box.pack(side="left",padx=(0,3))
-    brush_button=ttk.Button(editor_bar,text="Кисть",width=6,command=lambda:brush())
+    brush_button=ttk.Button(editor_bar,text="Кисть",width=6,style="Toolbar.TButton",command=lambda:brush())
     brush_button.pack(side="left",padx=(0,4))
-    save_button=ttk.Button(bar,text="Сохранить",command=lambda:save())
+    save_button=ttk.Button(bar,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
 
-    ttk.Button(editor_bar,text="↶",width=3,command=lambda:history(False)).pack(side="left")
-    ttk.Button(editor_bar,text="↷",width=3,command=lambda:history(True)).pack(side="left",padx=(2,0))
-    export_button=ttk.Button(bar,text="Экспорт PDF",command=lambda:export())
-    update_button=ttk.Button(bar,text="Обновить",command=lambda:update_action())
-    empty=ttk.Frame(root)
+    ttk.Button(editor_bar,text="↶",width=3,style="Toolbar.TButton",command=lambda:history(False)).pack(side="left")
+    ttk.Button(editor_bar,text="↷",width=3,style="Toolbar.TButton",command=lambda:history(True)).pack(side="left",padx=(2,0))
+    export_button=ttk.Button(bar,text="Экспорт PDF",command=lambda:export(),style="Accent.TButton")
+    update_button=ttk.Button(bar,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
+    empty=Backdrop(root,"welcome.webp")
     empty.grid(row=1,sticky="nsew")
-    empty.columnconfigure(0,weight=1)
-    empty.rowconfigure(0,weight=1)
-    drop=ttk.Button(empty,text="Открыть документ\nили перетащить MD, TXT, DOCX",command=choose)
-    drop.grid(row=0,column=0,ipadx=40,ipady=35)
+    welcome=ttk.Frame(empty,padding=(26,22),style="Welcome.TFrame")
+    ttk.Label(welcome,text="MD to PDF",font=("TkDefaultFont",24,"bold"),style="Welcome.TLabel").pack()
+    ttk.Label(welcome,text="Откройте или перетащите документ",style="Welcome.TLabel",padding=(0,8,0,0)).pack()
+    ttk.Label(welcome,text="MD · TXT · DOCX",style="Welcome.TLabel",padding=(0,0,0,14)).pack()
+    actions=ttk.Frame(welcome,style="Welcome.TFrame")
+    actions.pack()
+    drop=ttk.Button(actions,text="Открыть",command=choose,style="Accent.TButton")
+    drop.pack(side="left",padx=(0,8))
+    paste_button=ttk.Button(actions,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
+    paste_button.pack(side="left")
+    empty.center_widget(welcome)
     preview=PagePreview(root,lambda ranges:select(ranges),lambda e:context(e))
     status=tk.StringVar(value="")
     status_label=ttk.Label(root,textvariable=status,padding=(10,3))
@@ -121,10 +134,41 @@ def main():
         except Exception as exc:
             messagebox.showerror("Открытие документа",str(exc),parent=root)
             return
-        state.update(workspace=ws,dirty=False,result=None,selection=[],brush=None,restore_selection=[])
+        show_workspace(ws,pasted=False)
+
+    def paste(_=None):
+        if state["updating"] or not discard_ok():
+            return
+        try:
+            text=root.clipboard_get()
+        except tk.TclError:
+            messagebox.showinfo("Вставить текст","В буфере обмена нет текста.",parent=root)
+            return
+        try:
+            ws=Workspace.from_clipboard(text,clipboard_dir.name,**options())
+        except Exception as exc:
+            messagebox.showerror("Вставить текст",str(exc),parent=root)
+            return
+        show_workspace(ws,pasted=True)
+
+    def paste_shortcut(event):
+        # Native paste inside font/size/header entry fields must keep working.
+        if event.widget.winfo_class() in ("Entry","TEntry","TCombobox","Text","Spinbox","TSpinbox"):
+            return
+        if event.widget.winfo_toplevel()!=root:
+            return
+        paste()
+        return "break"
+
+    def show_workspace(ws,pasted):
+        state.update(workspace=ws,dirty=pasted,pasted=pasted,paste_pdf=None,result=None,
+                     selection=[],brush=None,restore_selection=[])
         brush_button.configure(text="Кисть")
         update_fields()
         empty.grid_remove()
+        chrome.grid(row=0,sticky="ew")
+        if not open_button.winfo_manager():
+            open_button.pack(side="left",before=editor_bar) if editor_bar.winfo_manager() else open_button.pack(side="left")
         editor_bar.pack(side="left")
         export_button.pack(side="right")
         save_button.pack(side="right",padx=4)
@@ -247,8 +291,20 @@ def main():
         if not state["workspace"] or state["updating"]:
             return
         try:
-            state["workspace"].save(preset.get())
-            state["dirty"]=False
+            ws=state["workspace"]
+            if state["pasted"]:
+                name=filedialog.asksaveasfilename(parent=root,defaultextension=".md",
+                     initialfile="Документ.md",filetypes=[("Markdown","*.md")])
+                if not name:
+                    return
+                ws.save_pasted(name,preset.get())
+                state["pasted"]=False
+                state["paste_pdf"]=None
+                state["dirty"]=False
+                render(preserve=True)
+            else:
+                ws.save(preset.get())
+                state["dirty"]=False
             message("Правки сохранены")
             root.after(1800,lambda:message() if status.get()=="Правки сохранены" else None)
         except Exception as exc:
@@ -262,7 +318,17 @@ def main():
         if not state["result"] or state["rendering"] or state["updating"]:
             return
         try:
-            export_bytes(state["workspace"].source,state["result"][0])
+            if state["pasted"]:
+                name=state["paste_pdf"]
+                if not name:
+                    name=filedialog.asksaveasfilename(parent=root,defaultextension=".pdf",
+                        initialfile="Документ.pdf",filetypes=[("PDF","*.pdf")])
+                    if not name:
+                        return
+                write_pdf_bytes(name,state["result"][0])
+                state["paste_pdf"]=name
+            else:
+                export_bytes(state["workspace"].source,state["result"][0])
             message("PDF сохранён")
             root.after(2200,lambda:message() if status.get()=="PDF сохранён" else None)
         except Exception as exc:
@@ -301,7 +367,7 @@ def main():
         ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=6,pady=6)
         dialog.grab_set()
     if drag:
-        for widget in (root,drop,preview.canvas):
+        for widget in (root,empty,welcome,drop,paste_button,preview.canvas):
             widget.drop_target_register(DND_FILES)
             def dropped(event):
                 paths=root.tk.splitlist(event.data)
@@ -363,6 +429,7 @@ def main():
                 elif kind=="update" and value:
                     state["update"]=value
                     update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
+                    chrome.grid(row=0,sticky="ew")
                     update_button.pack(side="right",padx=6)
                 elif kind=="update-exit":
                     preview.close()
@@ -383,11 +450,24 @@ def main():
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
     root.bind("<Control-o>",lambda e:choose())
+    root.bind("<Control-v>",paste_shortcut)
+    if sys.platform=="darwin":
+        root.bind("<Command-v>",paste_shortcut)
     root.bind("<Control-s>",lambda e:save())
     root.bind("<Control-z>",lambda e:history(False))
     root.bind("<Control-y>",lambda e:history(True))
     root.after(80,poll)
-    root.mainloop()
+    try:
+        root.mainloop()
+    finally:
+        # In the production main loop this is reached on shutdown. A test may
+        # substitute a nonblocking mainloop and keep the root alive.
+        try:
+            alive=root.winfo_exists()
+        except tk.TclError:
+            alive=False
+        if not alive:
+            clipboard_dir.cleanup()
 
 if __name__=="__main__":
     main()

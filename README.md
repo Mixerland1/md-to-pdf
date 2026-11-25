@@ -97,6 +97,10 @@ PDF conversion uses local assets from the source or custom stylesheet folder and
 
 See [feature comparison, methodology and benchmark instructions](benchmark/README.md). The [comparison workflow](https://github.com/Mixerland1/md-to-pdf/actions/workflows/benchmark.yml) runs the actual yzane.markdown-pdf extension in VS Code and records measurements. Do not interpret the feature matrix as measured superiority.
 
+## Roadmap / Дальнейшее развитие
+
+See [product roadmap](docs/ROADMAP.md) for planned TXT/DOCX input, corporate profiles (Granulex first), and a visual style constructor. These features are under development for 0.3.0; the stable release remains 0.2.0.
+
 ## Development
 
 ```sh

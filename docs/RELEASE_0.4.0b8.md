@@ -1,0 +1,7 @@
+# 0.4.0 beta 8 — header metadata and table controls
+
+The fragment style list now includes Version and Last updated. In a branded preset, assigning these roles to a complete text-only paragraph moves it into the corresponding empty right-aligned header field, removes the original paragraph to prevent duplication, and preserves the selection where PDF mapping permits. Existing populated fields are protected against accidental replacement and can be edited through Edit header. Existing nonempty metadata is selectable and its role is reflected in the toolbar. In non-branded presets the two roles are right-aligned body styles. Metadata movement may be skipped when replaying an action into a preset that already extracted the same source paragraph.
+
+Existing table cells have explicit Cell and Table heading styles. Cell roles can be changed without flattening the table. When a cell is selected, Table parameters appears in the style dropdown and context menu: table width (20–100%), horizontal position and borders. Parameters persist with other local edits. This is not a table-creation or column-layout editor. Complex nested table/paragraph structures remain protected.
+
+Previous beta 7 clipboard and format-by-sample changes remain. Manual acceptance pending.

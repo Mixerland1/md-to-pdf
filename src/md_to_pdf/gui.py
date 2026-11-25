@@ -1,6 +1,7 @@
 """Minimal single-document editor with real PDF page preview."""
 from __future__ import annotations
 import queue
+import json
 import re
 import sys
 import threading
@@ -22,6 +23,8 @@ BUILTINS={"Технический":"technical","Деловой":"business","Уч
 STYLES={"Текст":"normal","Заголовок 1":"h1","Заголовок 2":"h2","Заголовок 3":"h3",
         "Маркированный список":"bullet","Нумерованный список":"numbered","Заголовок 4":"h4","Заголовок 5":"h5","Заголовок 6":"h6",
         "Цитата":"quote","Примечание":"note","Предупреждение":"warning","Блок кода":"code-block",
+        "Версия":"meta-version","Последнее обновление":"meta-updated",
+        "Ячейка таблицы":"table-cell","Заголовок таблицы":"table-heading",
         "Полужирный":"bold","Курсив":"italic","Код":"code","Акцент":"accent"}
 
 def main():
@@ -291,10 +294,16 @@ def main():
     def update_fields():
         ws=state["workspace"]
         ranges=state["selection"]
+        styles.configure(values=tuple(STYLES))
         if not ws or not ranges:
             role.set("Стиль фрагмента");font.set("Шрифт");size.set("pt")
             return
         current=ws.model.selection_role(ranges)
+        try:
+            ws.model.table_settings(ranges)
+            styles.configure(values=(*STYLES,"Параметры таблицы…"))
+        except ValueError:
+            pass
         labels={v:k for k,v in STYLES.items()}
         labels.update(mixed="Разные стили",li="Список",td="Ячейка",th="Шапка таблицы")
         role.set(labels.get(current,current))
@@ -334,6 +343,10 @@ def main():
             messagebox.showerror("Стиль",str(exc),parent=root)
     combo.bind("<<ComboboxSelected>>",switch)
     def apply(_=None):
+        if role.get()=="Параметры таблицы…":
+            update_fields()
+            table_dialog()
+            return
         style=STYLES.get(role.get())
         if not style or not state["workspace"] or state["rendering"]:
             return
@@ -347,7 +360,7 @@ def main():
             update_fields()
             return
         try:
-            state["workspace"].apply(style,state["selection"])
+            state["selection"]=state["workspace"].apply(style,state["selection"])
             state["dirty"]=True
             render(preserve=True)
         except (ValueError,TypeError) as exc:
@@ -436,6 +449,45 @@ def main():
             root.after(2200,lambda:message() if status.get()=="PDF сохранён" else None)
         except Exception as exc:
             messagebox.showerror("Экспорт PDF",str(exc),parent=root)
+    def table_dialog():
+        ws=state["workspace"]
+        ranges=list(state["selection"])
+        if not ws or state["rendering"] or not ranges:
+            return
+        try:
+            settings=ws.model.table_settings(ranges)
+        except ValueError as exc:
+            message(str(exc))
+            return
+        dialog=tk.Toplevel(root)
+        dialog.title("Параметры таблицы")
+        dialog.transient(root)
+        dialog.columnconfigure(1,weight=1)
+        width=tk.StringVar(value=str(settings["width"]))
+        aligns={"Слева":"left","По центру":"center","Справа":"right"}
+        grids={"Как в пресете":"preset","Показать":"show","Скрыть":"hide"}
+        alignment=tk.StringVar(value=next(k for k,v in aligns.items() if v==settings["align"]))
+        grid=tk.StringVar(value=next(k for k,v in grids.items() if v==settings["grid"]))
+        for i,label in enumerate(("Ширина, %","Положение таблицы","Границы ячеек")):
+            ttk.Label(dialog,text=label,padding=8).grid(row=i,column=0,sticky="w")
+        ttk.Spinbox(dialog,from_=20,to=100,increment=5,textvariable=width,width=8).grid(row=0,column=1,sticky="ew",padx=8,pady=6)
+        ttk.Combobox(dialog,textvariable=alignment,values=tuple(aligns),state="readonly").grid(row=1,column=1,sticky="ew",padx=8,pady=6)
+        ttk.Combobox(dialog,textvariable=grid,values=tuple(grids),state="readonly").grid(row=2,column=1,sticky="ew",padx=8,pady=6)
+        def accept():
+            try:
+                value=int(width.get())
+                if not 20<=value<=100:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showinfo("Параметры таблицы","Ширина от 20 до 100 %.",parent=dialog)
+                return
+            dialog.destroy()
+            state["selection"]=ranges
+            apply_values("table-settings:"+json.dumps({"width":value,"align":aligns[alignment.get()],"grid":grids[grid.get()]}))
+        ttk.Button(dialog,text="Применить",style="Accent.TButton",command=accept).grid(row=3,column=1,sticky="e",padx=8,pady=8)
+        dialog.bind("<Escape>",lambda e:dialog.destroy())
+        dialog.grab_set()
+
     def context(event):
         ws=state["workspace"]
         if not ws:
@@ -444,6 +496,12 @@ def main():
         if state["selection"]:
             for name in STYLES:
                 menu.add_command(label=name,command=lambda n=name:(role.set(n),apply()))
+        if state["selection"]:
+            try:
+                ws.model.table_settings(state["selection"])
+                menu.add_command(label="Параметры таблицы…",command=table_dialog)
+            except ValueError:
+                pass
         if ws.model.header_fields() is not None:
             menu.add_command(label="Изменить шапку…",command=edit_header)
         if menu.index("end") is not None:

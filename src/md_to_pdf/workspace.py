@@ -48,7 +48,7 @@ class Workspace:
             previous=model.html()
             try:
                 for item in (style if isinstance(style,list) else [style]):
-                    model.apply(item,ranges)
+                    ranges=model.apply(item,ranges) or ranges
             except (ValueError,TypeError):
                 model._load(previous)
                 skipped += 1
@@ -64,14 +64,16 @@ class Workspace:
         previous = self.model.html()
         keys = block_keys(self.model)
         selections = [(keys[i],a,b) for i,a,b in ranges]
+        result=ranges
         try:
             for item in (style if isinstance(style,list) else [style]):
-                self.model.apply(item,ranges)
+                result=self.model.apply(item,result) or result
         except Exception:
             self.model._load(previous)
             raise
         self.actions.append(("style",(style,selections)))
         self.redo_actions.clear()
+        return result
 
     def header(self, fields):
         self.model.set_header(*fields)

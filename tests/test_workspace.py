@@ -91,3 +91,37 @@ class WorkspaceTests(unittest.TestCase):
             restored=Workspace(p,template="granulex")
             restored.restore()
             self.assertEqual(restored.model.selection_role([(2,0,3)]),"h2")
+
+    def test_metadata_roles_and_table_parameters(self):
+        import json
+        from lxml import html
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/"metadata.md"
+            p.write_text("# Title\n\n3.1.0\n\nноябрь 2026\n\n| Name | Value |\n| --- | --- |\n| A | B |\n",encoding="utf-8")
+            w=Workspace(p,template="granulex")
+            version=w.apply("meta-version",[(1,0,5)])
+            self.assertEqual(w.model.selection_role(version),"meta-version")
+            updated=w.apply("meta-updated",[(1,0,len("ноябрь 2026"))])
+            self.assertEqual(w.model.selection_role(updated),"meta-updated")
+            self.assertEqual(w.model.header_fields()[1:],("Версия 3.1.0","Последнее обновление: ноябрь 2026"))
+            self.assertEqual(w.model.html().count("3.1.0"),1)
+            self.assertEqual(w.model.selection_role([(1,0,4)]),"table-heading")
+            w.apply("table-cell",[(1,0,4)])
+            self.assertEqual(w.model.selection_role([(1,0,4)]),"table-cell")
+            settings={"width":70,"align":"right","grid":"show"}
+            w.apply("table-settings:"+json.dumps(settings),[(1,0,4)])
+            self.assertEqual(w.model.table_settings([(1,0,4)]),settings)
+            doc=html.document_fromstring(w.model.html())
+            self.assertEqual(len(doc.xpath("//table//tr")),2)
+            self.assertIn("width: 70%",doc.xpath("//table/@style")[0])
+            data,ids,texts,locations=render_snapshot(w.snapshot())
+            with pdfium.PdfDocument(data) as pdf:
+                glyphs,mapping=map_glyphs(pdf,ids,texts,locations)
+                self.assertTrue(any(w.model.blocks()[i].role=="meta-version" for i,_ in mapping.values()))
+                self.assertTrue(any(w.model.blocks()[i].role=="meta-updated" for i,_ in mapping.values()))
+            w.save("Granulex")
+            reopened=Workspace(p,template="granulex")
+            reopened.restore()
+            self.assertEqual(reopened.model.header_fields()[1:],w.model.header_fields()[1:])
+            self.assertEqual(reopened.model.table_settings([(1,0,4)]),settings)
+            self.assertEqual(reopened.skipped,0)

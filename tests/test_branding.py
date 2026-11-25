@@ -40,6 +40,14 @@ class BrandingTests(unittest.TestCase):
             self.assertNotIn("<script>", html)
             self.assertNotIn('class="brand-logo"', render_html(p))
 
+    def test_legacy_header_stray_quote(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "legacy.md"
+            p.write_text(HEADER.replace('Z"/>', 'Z"  "/>') + "# Body", encoding="utf-8")
+            html = render_html(p, template="granulex")
+            self.assertEqual(html.count('class="brand-logo"'), 1)
+            self.assertIn("Example product", html)
+
     def test_svg_rejects_external_and_active_content(self):
         for bad in ('<script/>', '<image href="https://example.com/logo.png"/>',
                     '<path d="M0 0" onload="x"/>', '<path fill="url(https://example.com/x)"/>'):

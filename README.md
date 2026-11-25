@@ -103,7 +103,7 @@ See [product roadmap](docs/ROADMAP.md) for planned TXT/DOCX input, corporate pro
 
 ## Development branch — Brand Style Studio 0.3.0
 
-The next version supports Markdown, TXT and semantic DOCX import, Granulex branding and a local profile editor with logo import, colors, fonts, page margins, footer and PDF preview. These features are not yet in the stable 0.2.0 Windows release. See [document import](docs/IMPORTS.md) and [brand profile instructions / Конструктор стилей](docs/PROFILES.md).
+The next version supports Markdown, TXT and semantic DOCX import, Granulex branding and a local profile editor with logo import, colors, fonts, page margins, footer and PDF preview. These features are not yet in the stable 0.2.0 Windows release. See [document import](docs/IMPORTS.md), [brand profile instructions / Конструктор стилей](docs/PROFILES.md) and [Granulex visual QA](docs/GRANULEX_QA.md). Run `python scripts/fetch_fonts.py` before installing from this branch to package the verified public fonts.
 
 ## Development
 

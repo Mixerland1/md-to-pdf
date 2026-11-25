@@ -65,7 +65,7 @@ def extract_header(text: str) -> tuple[str, Header]:
         name=unescape(match["name"]),
         version=unescape(match["version"]),
         updated=unescape(match["updated"]),
-        svg=safe_svg(match["svg"]),
+        svg=safe_svg(re.sub(r'"\s+"\s*/>', '"/>', match["svg"])),  # legacy stray quote before path close
     )
 
 

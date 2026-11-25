@@ -20,8 +20,8 @@ def main():
         root = tk.Tk()
         drag = False
     root.title("MD to PDF • 0.3.0 dev")
-    root.geometry("820x570")
-    root.minsize(650, 460)
+    root.geometry("820x680")
+    root.minsize(690, 590)
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     panel = ttk.Frame(root, padding=24)
@@ -40,6 +40,9 @@ def main():
     template = tk.StringVar(value="technical")
     directory = tk.StringVar()
     css = tk.StringVar()
+    brand_name = tk.StringVar()
+    brand_version = tk.StringVar()
+    brand_updated = tk.StringVar()
     status = tk.StringVar(value="Ready / Готово")
     controls = []
     def add(paths):
@@ -107,6 +110,23 @@ def main():
     pathrow(2, "Custom CSS (optional)", css, choose_css)
     ov = ttk.Checkbutton(settings, text="Overwrite / Перезаписывать PDF", variable=overwrite)
     ov.grid(row=3, column=1, sticky="w"); controls.append(ov)
+    brand_fields = ttk.Frame(settings)
+    brand_fields.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+    brand_fields.columnconfigure(1, weight=1)
+    for i, (label, var) in enumerate((("Product / Продукт", brand_name),
+                                      ("Version / Версия", brand_version),
+                                      ("Updated / Обновление", brand_updated))):
+        ttk.Label(brand_fields, text=label).grid(row=i, column=0, sticky="w", padx=(0, 8))
+        entry = ttk.Entry(brand_fields, textvariable=var)
+        entry.grid(row=i, column=1, sticky="ew", pady=2)
+        controls.append(entry)
+    def show_brand(*_):
+        if template.get() == "granulex":
+            brand_fields.grid()
+        else:
+            brand_fields.grid_remove()
+    template.trace_add("write", show_brand)
+    show_brand()
     progress = ttk.Progressbar(panel, mode="determinate")
     progress.grid(row=6, sticky="ew", pady=(12, 4))
     ttk.Label(panel, textvariable=status, wraplength=700).grid(row=7, sticky="w")
@@ -126,6 +146,9 @@ def main():
             if custom and not custom.is_file():
                 raise ValueError("CSS file not found")
             preset = template.get()
+            meta = dict(brand_name=brand_name.get().strip() or None,
+                        brand_version=brand_version.get().strip() or None,
+                        brand_updated=brand_updated.get().strip() or None)
         except (ValueError, OSError) as exc:
             messagebox.showerror("MD to PDF", str(exc), parent=root)
             return
@@ -136,7 +159,7 @@ def main():
             errors = []
             for i, (source, target) in enumerate(jobs, 1):
                 try:
-                    convert(source, target, css=custom, template=preset)
+                    convert(source, target, css=custom, template=preset, **meta)
                 except Exception as exc:
                     errors.append(f"{source.name}: {exc}")
                 events.put(("progress", i, len(jobs)))

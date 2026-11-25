@@ -10,7 +10,8 @@ import sys
 from urllib.parse import urlsplit, unquote
 
 import mistune
-from .inputs import source_html
+from .inputs import source_html, read_text, MARKDOWN_EXTENSIONS
+from .branding import Header, extract_header, render_header
 
 TEMPLATES = ('technical', 'business', 'academic', 'granulex')
 
@@ -33,13 +34,25 @@ class DocumentRenderer(mistune.HTMLRenderer):
 
 def render_html(source: Path, *, title: str | None = None,
                 document_date: str | None = None, css: Path | None = None,
-                allow_html: bool = False, template: str = 'technical') -> str:
+                allow_html: bool = False, template: str = 'technical',
+                brand_name: str | None = None, brand_version: str | None = None,
+                brand_updated: str | None = None) -> str:
     source = source.resolve()
     title = title or source.stem
     document_date = document_date or date.today().strftime("%d.%m.%Y")
     markdown = mistune.create_markdown(renderer=DocumentRenderer(allow_html=allow_html),
                                       plugins=["table", "strikethrough", "task_lists", "footnotes", "url"])
-    content = source_html(source, markdown)
+    brand = ""
+    if template == "granulex":
+        if source.suffix.lower() in MARKDOWN_EXTENSIONS:
+            text, header = extract_header(read_text(source))
+            content = markdown(text)
+        else:
+            header = Header()
+            content = source_html(source, markdown)
+        brand = render_header(header, name=brand_name, version=brand_version, updated=brand_updated)
+    else:
+        content = source_html(source, markdown)
     style = Path(__file__).with_name("print.css").read_text(encoding="utf-8")
     if template not in TEMPLATES:
         raise ValueError(f"Unknown template: {template}")
@@ -53,19 +66,22 @@ def render_html(source: Path, *, title: str | None = None,
 <title>{escape(title)}</title><style>{style}</style>{custom}</head>
 <body><div class="document-title">{escape(title)}</div>
 <div class="document-date">{escape(document_date)}</div>
-<main>{content}</main></body></html>'''
+<main>{brand}{content}</main></body></html>'''
 
 
 def convert(source: Path, output: Path, *, title: str | None = None,
             document_date: str | None = None, css: Path | None = None,
-            allow_html: bool = False, html_only: bool = False, template: str = 'technical') -> None:
+            allow_html: bool = False, html_only: bool = False, template: str = 'technical',
+                brand_name: str | None = None, brand_version: str | None = None,
+                brand_updated: str | None = None) -> None:
     source, output = source.resolve(), output.resolve()
     if source == output:
         raise ValueError("Input and output must be different files")
     if css and not css.is_file():
         raise FileNotFoundError(css)
     html = render_html(source, title=title, document_date=document_date,
-                       css=css, allow_html=allow_html, template=template)
+                       css=css, allow_html=allow_html, template=template,
+                       brand_name=brand_name, brand_version=brand_version, brand_updated=brand_updated)
     output.parent.mkdir(parents=True, exist_ok=True)
     if html_only:
         output.write_text(html, encoding="utf-8")
@@ -106,6 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--date", help="Footer date (default: today, DD.MM.YYYY)")
     parser.add_argument("--html-only", action="store_true", help="Export HTML rather than PDF")
     parser.add_argument("--allow-html", action="store_true", help="Allow raw HTML in trusted Markdown (not TXT or DOCX)")
+    parser.add_argument("--brand-name", help="Granulex header product name")
+    parser.add_argument("--brand-version", help="Granulex header product version")
+    parser.add_argument("--brand-updated", help="Granulex header update date/text")
     args = parser.parse_args(argv)
     from .batch import collect_sources, plan_outputs
     try:
@@ -122,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             convert(source, output, title=args.title, document_date=args.date,
                     css=args.css, allow_html=args.allow_html, html_only=args.html_only,
-                    template=args.template)
+                    template=args.template, brand_name=args.brand_name,
+                    brand_version=args.brand_version, brand_updated=args.brand_updated)
             print(f"Wrote {output.resolve()}")
         except Exception as exc:
             failures += 1

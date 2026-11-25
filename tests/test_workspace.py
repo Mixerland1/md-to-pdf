@@ -26,3 +26,26 @@ class WorkspaceTests(unittest.TestCase):
             target=export_bytes(p,data)
             self.assertEqual(target.read_bytes(),data)
             self.assertIn("Alpha linked text.",p.read_text(encoding="utf-8"))
+
+    def test_selection_roles_typography_and_save(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/"guide.md"
+            p.write_text("# Heading\n\nNormal text.",encoding="utf-8")
+            w=Workspace(p,template="granulex")
+            self.assertEqual(w.model.selection_role([(0,0,3)]),"h1")
+            self.assertEqual(w.model.selection_role([(0,0,3),(1,0,3)]),"mixed")
+            w.apply(["h2","font:Arial","size:14"],[(1,0,6)])
+            self.assertEqual(w.model.selection_role([(1,0,6)]),"h2")
+            self.assertIn('font-size: 14pt',w.model.html())
+            self.assertTrue(w.undo())
+            self.assertEqual(w.model.selection_role([(1,0,6)]),"normal")
+            w.redo()
+            w.save("Granulex")
+            restored=Workspace(p,template="technical")
+            self.assertEqual(restored.restore(),"Granulex")
+            self.assertEqual(restored.model.selection_role([(1,0,6)]),"h2")
+            self.assertIn('font-size: 14pt',restored.model.html())
+            self.assertEqual(p.read_text(encoding="utf-8"),"# Heading\n\nNormal text.")
+            p.write_text("Changed",encoding="utf-8")
+            with self.assertRaises(ValueError):
+                Workspace(p,template="granulex").restore()

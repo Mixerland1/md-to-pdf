@@ -2,6 +2,10 @@
 from collections import defaultdict
 from pathlib import Path
 import tempfile
+import hashlib
+import json
+from dataclasses import asdict
+from .profiles import Profile
 from .cli import render_html, layout_pdf
 from .editor_model import DocumentEditor
 
@@ -17,6 +21,7 @@ def block_keys(model):
 class Workspace:
     def __init__(self, source, **options):
         self.source = Path(source).resolve()
+        self.source_hash = hashlib.sha256(self.source.read_bytes()).hexdigest()
         self.options = options
         self.actions = []
         self.redo_actions = []
@@ -41,7 +46,8 @@ class Workspace:
                 skipped += 1
                 continue
             try:
-                model.apply(style,ranges)
+                for item in (style if isinstance(style,list) else [style]):
+                    model.apply(item,ranges)
             except ValueError:
                 skipped += 1
         self.model = model
@@ -52,9 +58,16 @@ class Workspace:
         self._rebuild(options)
 
     def apply(self, style, ranges):
+        # Composite brush changes are one undoable operation.
+        previous = self.model.html()
         keys = block_keys(self.model)
         selections = [(keys[i],a,b) for i,a,b in ranges]
-        self.model.apply(style,ranges)
+        try:
+            for item in (style if isinstance(style,list) else [style]):
+                self.model.apply(item,ranges)
+        except Exception:
+            self.model._load(previous)
+            raise
         self.actions.append(("style",(style,selections)))
         self.redo_actions.clear()
 
@@ -76,6 +89,61 @@ class Workspace:
         self.actions.append(self.redo_actions.pop())
         self._rebuild(self.options)
         return True
+
+    @property
+    def project_path(self):
+        return self.source.with_name(self.source.name+".mdtopdf")
+
+    def save(self, label):
+        if hashlib.sha256(self.source.read_bytes()).hexdigest()!=self.source_hash:
+            raise ValueError("Исходный файл изменился. Откройте его заново.")
+        profile=self.options.get("profile")
+        value={"schema":1,"source_sha256":self.source_hash,"preset":label,
+               "template":self.options.get("template","technical"),
+               "profile":asdict(profile) if profile else None,"actions":self.actions}
+        data=json.dumps(value,ensure_ascii=False,indent=2).encode("utf-8")
+        if len(data)>8_000_000:
+            raise ValueError("Слишком большой проект")
+        with tempfile.NamedTemporaryFile(dir=self.source.parent,delete=False) as out:
+            temporary=Path(out.name)
+            try:
+                out.write(data)
+            except Exception:
+                out.close()
+                temporary.unlink(missing_ok=True)
+                raise
+        try:
+            temporary.replace(self.project_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return self.project_path
+
+    def restore(self):
+        if not self.project_path.is_file():
+            return None
+        with self.project_path.open("rb") as stream:
+            data=stream.read(8_000_001)
+        if len(data)>8_000_000:
+            raise ValueError("Слишком большой проект")
+        value=json.loads(data)
+        if value.get("schema")!=1 or value.get("source_sha256")!=self.source_hash:
+            raise ValueError("Сохранённые правки относятся к другой версии исходного файла.")
+        profile=Profile(**value["profile"]).validate() if value.get("profile") else None
+        actions=[]
+        for kind,payload in value["actions"]:
+            if kind=="header" and len(payload)==3 and all(isinstance(v,str) for v in payload):
+                actions.append((kind,tuple(payload)))
+            elif kind=="style":
+                style,selections=payload
+                styles=style if isinstance(style,list) else [style]
+                if not styles or len(styles)>3 or not all(isinstance(v,str) for v in styles):
+                    raise ValueError("Некорректный стиль проекта")
+                actions.append((kind,(style,[(tuple(key),a,b) for key,a,b in selections])))
+            else:
+                raise ValueError("Неизвестная операция проекта")
+        self.actions=actions
+        self._rebuild(dict(template=value["template"],profile=profile))
+        return value.get("preset","")
 
     def snapshot(self):
         html, anchors = self.model.preview_html()

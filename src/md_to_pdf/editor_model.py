@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from lxml import html, etree
+from .profiles import FONT
+import math
 
 INLINE_STYLES = {"bold": ("strong", ""), "italic": ("em", ""),
                  "code": ("code", ""), "accent": ("span", "brand-accent")}
@@ -47,11 +49,13 @@ def _text_slots(node):
             yield child, "tail", child.tail
 
 
-def _wrap_slot(node, attr, start, end, tag, cls):
+def _wrap_slot(node, attr, start, end, tag, cls, css=None):
     value = getattr(node, attr)
     wrapper = etree.Element(tag)
     if cls:
         wrapper.set("class", cls)
+    if css:
+        wrapper.set("style", css)
     wrapper.text = value[start:end]
     wrapper.tail = value[end:]
     setattr(node, attr, value[:start])
@@ -175,10 +179,37 @@ class DocumentEditor:
             return True
         return False
 
+    def selection_role(self, ranges):
+        roles = []
+        blocks = self.blocks()
+        for i,a,b in ranges:
+            block = blocks[i]
+            role = {"p":"normal","div":"normal","blockquote":"quote","pre":"code-block"}.get(block.role,block.role)
+            pos = 0
+            for value,bold,italic,mono,accent in self.runs(i):
+                if pos < b and pos+len(value)>a:
+                    # Semantic paragraph roles take precedence; inline roles
+                    # are shown for ordinary text only.
+                    inline = [k for k,flag in (("bold",bold),("italic",italic),("code",mono),("accent",accent)) if flag]
+                    roles.append(role if role!="normal" or not inline else inline[0] if len(inline)==1 else "mixed")
+                pos += len(value)
+        return roles[0] if roles and all(x==roles[0] for x in roles) else "mixed" if roles else ""
+
     def apply(self, style, ranges):
         """Ranges are (block index, start, end) in Python Unicode characters."""
         nodes = self._nodes()
-        if style not in INLINE_STYLES and style not in BLOCK_STYLES:
+        css = None
+        if style.startswith("font:"):
+            family = style[5:]
+            if not FONT.fullmatch(family):
+                raise ValueError("Недопустимое название шрифта")
+            css = 'font-family: "' + family + '", sans-serif'
+        elif style.startswith("size:"):
+            size = float(style[5:])
+            if not math.isfinite(size) or not 5 <= size <= 72:
+                raise ValueError("Размер шрифта: от 5 до 72 pt")
+            css = f"font-size: {size:g}pt"
+        elif style not in INLINE_STYLES and style not in BLOCK_STYLES:
             raise ValueError("Unknown style")
         spans = {}
         for index, start, end in ranges:
@@ -210,7 +241,7 @@ class DocumentEditor:
                 else:
                     node.attrib.pop("class", None)
             else:
-                tag, cls = INLINE_STYLES[style]
+                tag, cls = ("span","") if css else INLINE_STYLES[style]
                 pos = 0
                 changes = []
                 for owner, attr, text in _text_slots(node):
@@ -219,4 +250,4 @@ class DocumentEditor:
                         changes.append((owner, attr, a, b))
                     pos += len(text)
                 for owner, attr, a, b in reversed(changes):
-                    _wrap_slot(owner, attr, a, b, tag, cls)
+                    _wrap_slot(owner, attr, a, b, tag, cls, css)

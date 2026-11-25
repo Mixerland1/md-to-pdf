@@ -6,6 +6,7 @@ import threading
 import webbrowser
 from pathlib import Path
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk,filedialog,messagebox
 from . import __version__
 from .inputs import EXTENSIONS
@@ -28,24 +29,28 @@ def main():
         root=tk.Tk()
         drag=False
     root.title("MD to PDF • "+__version__)
-    root.geometry("1000x780")
-    root.minsize(660,480)
+    root.geometry("1200x820")
+    root.minsize(800,480)
     root.columnconfigure(0,weight=1)
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
     state={"workspace":None,"result":None,"generation":0,"rendering":False,
-           "dirty":False,"selection":[],"update":None,"updating":False}
+           "dirty":False,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
     profiles=list_profiles()
     preset=tk.StringVar(value="Технический")
     role=tk.StringVar(value="Стиль фрагмента")
+    font=tk.StringVar(value="Шрифт")
+    size=tk.StringVar(value="pt")
     bar=ttk.Frame(root,padding=(10,8))
     bar.grid(row=0,sticky="ew")
     def options():
         key=preset.get()
         p=load_profile(profiles[key]) if key in profiles else None
+        if key not in BUILTINS and p is None and state["workspace"]:
+            return state["workspace"].options
         return dict(template=p.base if p else BUILTINS[key],profile=p)
     def discard_ok():
-        return not state["dirty"] or messagebox.askyesno("MD to PDF","Открыть другой документ без экспорта изменений?",parent=root)
+        return not state["dirty"] or messagebox.askyesno("MD to PDF","Открыть другой документ без сохранения изменений?",parent=root)
     def choose():
         name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx")])
         if name:
@@ -67,6 +72,15 @@ def main():
     ttk.Button(editor_bar,text="⚙",width=3,command=lambda:manage_profiles(root,selected=preset.get(),builtins=BUILTINS,on_change=refresh_profiles)).pack(side="left",padx=(0,6))
     styles=ttk.Combobox(editor_bar,textvariable=role,values=tuple(STYLES),state="readonly",width=19)
     styles.pack(side="left",padx=(0,4))
+    fonts=sorted(set(tkfont.families(root))|{"Montserrat","Roboto Mono","Arial","Times New Roman","DejaVu Sans"},key=str.casefold)
+    font_box=ttk.Combobox(editor_bar,textvariable=font,values=tuple(f for f in fonts if not f.startswith("@")),width=17)
+    font_box.pack(side="left",padx=(0,3))
+    size_box=ttk.Combobox(editor_bar,textvariable=size,values=("6","7","8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"),width=5)
+    size_box.pack(side="left",padx=(0,3))
+    brush_button=ttk.Button(editor_bar,text="Кисть",width=6,command=lambda:brush())
+    brush_button.pack(side="left",padx=(0,4))
+    save_button=ttk.Button(bar,text="Сохранить",command=lambda:save())
+
     ttk.Button(editor_bar,text="↶",width=3,command=lambda:history(False)).pack(side="left")
     ttk.Button(editor_bar,text="↷",width=3,command=lambda:history(True)).pack(side="left",padx=(2,0))
     export_button=ttk.Button(bar,text="Экспорт PDF",command=lambda:export())
@@ -94,29 +108,62 @@ def main():
             if not path.is_file() or path.suffix.lower() not in EXTENSIONS:
                 raise ValueError("Выберите один файл MD, TXT или DOCX")
             ws=Workspace(path,**options())
+            try:
+                saved=ws.restore()
+                if saved:
+                    if saved not in (*BUILTINS,*profiles):
+                        combo.configure(values=(*BUILTINS,*profiles,saved))
+                    preset.set(saved)
+            except Exception as exc:
+                messagebox.showwarning("Сохранённые правки",str(exc),parent=root)
+                ws=Workspace(path,**options())
         except Exception as exc:
             messagebox.showerror("Открытие документа",str(exc),parent=root)
             return
-        state.update(workspace=ws,dirty=False,result=None,selection=[])
+        state.update(workspace=ws,dirty=False,result=None,selection=[],brush=None,restore_selection=[])
         empty.grid_remove()
         editor_bar.pack(side="left")
         export_button.pack(side="right")
+        save_button.pack(side="right",padx=4)
         preview.grid(row=1,sticky="nsew")
         render()
     def select(ranges):
         state["selection"]=ranges or []
+        update_fields()
         if ranges is None:
             message("Этот фрагмент пока нельзя однозначно сопоставить с исходным текстом.")
         elif not state["rendering"]:
             message()
-    def render():
+            if ranges and state["brush"]:
+                copied=state["brush"]
+                state["brush"]=None
+                brush_button.configure(text="Кисть")
+                apply_values(copied)
+
+    def update_fields():
+        ws=state["workspace"]
+        ranges=state["selection"]
+        if not ws or not ranges:
+            role.set("Стиль фрагмента");font.set("Шрифт");size.set("pt")
+            return
+        current=ws.model.selection_role(ranges)
+        labels={v:k for k,v in STYLES.items()}
+        labels.update(mixed="Разные стили",li="Список",td="Ячейка",th="Шапка таблицы")
+        role.set(labels.get(current,current))
+        family,points=preview.selection_format()
+        font.set(family or "Шрифт")
+        size.set(points or "pt")
+
+    def render(preserve=False):
         state["generation"]+=1
         generation=state["generation"]
         state["result"]=None
+        state["restore_selection"]=list(state["selection"]) if preserve else []
         state["selection"]=[]
         state["rendering"]=True
         export_button.configure(state="disabled")
-        styles.configure(state="disabled")
+        for control in (styles,font_box,size_box,brush_button):
+            control.configure(state="disabled")
         message("Вёрстка…")
         snapshot=state["workspace"].snapshot()
         def worker():
@@ -138,19 +185,61 @@ def main():
     combo.bind("<<ComboboxSelected>>",switch)
     def apply(_=None):
         style=STYLES.get(role.get())
-        role.set("Стиль фрагмента")
         if not style or not state["workspace"] or state["rendering"]:
             return
         if not state["selection"]:
             message("Выделите текст на странице.")
             return
+        apply_values(style)
+    def apply_values(style):
+        if state["rendering"] or state["updating"] or not state["selection"]:
+            return
         try:
             state["workspace"].apply(style,state["selection"])
             state["dirty"]=True
-            render()
-        except ValueError as exc:
+            render(preserve=True)
+        except (ValueError,TypeError) as exc:
             message(str(exc))
+            update_fields()
     styles.bind("<<ComboboxSelected>>",apply)
+    def font_change(_=None):
+        value=font.get().strip()
+        if value not in ("Шрифт","Разные"):
+            apply_values("font:"+value)
+    def size_change(_=None):
+        value=size.get().strip().replace(",",".")
+        if value not in ("pt","Разные"):
+            apply_values("size:"+value)
+    font_box.bind("<<ComboboxSelected>>",font_change)
+    font_box.bind("<Return>",font_change)
+    size_box.bind("<<ComboboxSelected>>",size_change)
+    size_box.bind("<Return>",size_change)
+    def brush():
+        if state["brush"]:
+            state["brush"]=None
+            brush_button.configure(text="Кисть")
+            return
+        if not state["selection"]:
+            message("Выделите образец оформления.")
+            return
+        style=STYLES.get(role.get())
+        family,points=preview.selection_format()
+        if not style or family in ("","Разные") or points in ("","Разные"):
+            message("Для кисти выберите фрагмент с единым оформлением.")
+            return
+        state["brush"]=[style,"font:"+family,"size:"+points]
+        brush_button.configure(text="Кисть ✓")
+        message("Выберите фрагмент, к которому применить оформление.")
+    def save():
+        if not state["workspace"] or state["updating"]:
+            return
+        try:
+            state["workspace"].save(preset.get())
+            state["dirty"]=False
+            message("Правки сохранены")
+            root.after(1800,lambda:message() if status.get()=="Правки сохранены" else None)
+        except Exception as exc:
+            messagebox.showerror("Сохранение",str(exc),parent=root)
     def history(redo):
         ws=state["workspace"]
         if ws and not state["updating"] and (ws.redo() if redo else ws.undo()):
@@ -161,7 +250,6 @@ def main():
             return
         try:
             export_bytes(state["workspace"].source,state["result"][0])
-            state["dirty"]=False
             message("PDF сохранён")
             root.after(2200,lambda:message() if status.get()=="PDF сохранён" else None)
         except Exception as exc:
@@ -245,10 +333,14 @@ def main():
                         continue
                     state["rendering"]=False
                     styles.configure(state="readonly")
+                    font_box.configure(state="normal")
+                    size_box.configure(state="normal")
+                    brush_button.configure(state="normal")
                     if kind=="render":
                         try:
                             preview.set_document(value)
                             state["result"]=value
+                            preview.restore_selection(state["restore_selection"])
                             export_button.configure(state="normal")
                             message("Некоторые правки не применимы к этому пресету." if state["workspace"].skipped else "")
                         except Exception as exc:
@@ -278,6 +370,7 @@ def main():
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
     root.bind("<Control-o>",lambda e:choose())
+    root.bind("<Control-s>",lambda e:save())
     root.bind("<Control-z>",lambda e:history(False))
     root.bind("<Control-y>",lambda e:history(True))
     root.after(80,poll)

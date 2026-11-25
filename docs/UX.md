@@ -12,3 +12,6 @@ Preview build: branch develop/v0.4.0 triggers Windows and both macOS artifacts, 
 
 ## Beta 2 supersedes the queue UI
 Single document only: open/drop, inline preset selector and contextual style selection, actual PDF pages, export. No file list, folder/remove buttons or persistent output instructions. Export writes the preview's exact PDF bytes next to the source, replacing the existing PDF. CLI batch remains. Unexported changes are protected when opening another file or closing. Complex unmapped text is not silently modified. No project persistence yet. Profile customization is available through one gear icon; updater button appears only when a release is available.
+
+## Beta 3 selection
+Click selects semantic block; drag selects characters with adjustable endpoints; merged blue line highlights. Current role, font, size shown; mixed state per control. Reflow restores selection. Font and point size overrides; one-shot brush for a uniform style. Save persists source-bound sidecar, Export PDF remains separate. No extra formatting ribbon. Manual visual acceptance pending.

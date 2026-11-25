@@ -1,6 +1,8 @@
 """Real PDF pages with conservative, layout-anchor-based text selection."""
 from dataclasses import dataclass
 import unicodedata
+import ctypes
+import re
 import tkinter as tk
 from tkinter import ttk
 import pypdfium2 as pdfium
@@ -15,6 +17,8 @@ class Glyph:
     page: int
     box: tuple
     char: str
+    font: str = ""
+    size: float = 0
 
 def glyphs_for(document):
     glyphs = []
@@ -36,7 +40,20 @@ def glyphs_for(document):
                     continue
                 if r<=l or t<=b:
                     continue
-                glyphs.extend(Glyph(i,(l,height-t,r,height-b),c) for c in value)
+                size=round(raw.FPDFText_GetFontSize(text.raw,index),2)
+                family=""
+                try:
+                    flags=ctypes.c_int()
+                    n=raw.FPDFText_GetFontInfo(text.raw,index,None,0,ctypes.byref(flags))
+                    if 0<n<512:
+                        buffer=ctypes.create_string_buffer(n)
+                        raw.FPDFText_GetFontInfo(text.raw,index,buffer,n,ctypes.byref(flags))
+                        family=buffer.value.decode("utf-8",errors="replace")
+                        family=re.sub(r"^[A-Z]{6}\+","",family)
+                        family=re.sub(r"[-, ](?:BoldItalic|BoldOblique|Regular|Bold|Italic|Oblique|Roman|Medium|SemiBold)$","",family,flags=re.I)
+                except (AttributeError,TypeError,ValueError):
+                    pass
+                glyphs.extend(Glyph(i,(l,height-t,r,height-b),c,family,size) for c in value)
         finally:
             text.close()
             page.close()
@@ -91,6 +108,9 @@ class PagePreview(ttk.Frame):
         self.mapping={}
         self.selected=[]
         self.start=None
+        self.press_xy=None
+        self.handle_drag=False
+        self.handles=[]
         self.scale=1.15
         self.canvas.bind("<Configure>",self._resize)
         self.canvas.bind("<MouseWheel>",self._wheel)
@@ -213,23 +233,22 @@ class PagePreview(ttk.Frame):
                 candidates.append((dx+dy*3,i))
         return min(candidates)[1] if candidates else None
 
-    def _press(self,event):
-        self.start=self._hit(event)
-        self.selected=[]
-        self.on_select([])
+    def restore_selection(self,ranges):
+        self.selected=[i for i,(block,offset) in self.mapping.items()
+                       if any(block==b and a<=offset<z for b,a,z in ranges)]
+        self.selected.sort()
         self._draw_selection()
+        self._notify()
 
-    def _drag(self,event):
-        end=self._hit(event)
-        if self.start is None or end is None:
-            return
-        a,b=sorted((self.start,end))
-        self.selected=list(range(a,b+1))
-        self._draw_selection()
+    def selection_format(self):
+        fonts={self.glyphs[i].font for i in self.selected if self.glyphs[i].font}
+        sizes={self.glyphs[i].size for i in self.selected if self.glyphs[i].size}
+        return (next(iter(fonts)) if len(fonts)==1 else "Разные" if fonts else "",
+                f"{next(iter(sizes)):g}" if len(sizes)==1 else "Разные" if sizes else "")
 
-    def _release(self,event):
-        self._drag(event)
+    def _notify(self):
         if not self.selected:
+            self.on_select([])
             return
         if any(i not in self.mapping for i in self.selected):
             self.on_select(None)
@@ -240,14 +259,65 @@ class PagePreview(ttk.Frame):
             groups.setdefault(block,[]).append(offset)
         self.on_select([(i,min(v),max(v)+1) for i,v in sorted(groups.items())])
 
+    def _press(self,event):
+        x,y=self.canvas.canvasx(event.x),self.canvas.canvasy(event.y)
+        self.press_xy=(event.x,event.y)
+        self.handle_drag=False
+        for side,hx,hy in self.handles:
+            if (x-hx)**2+(y-hy)**2<=15**2 and self.selected:
+                self.start=self.selected[-1] if side=="left" else self.selected[0]
+                self.handle_drag=True
+                return
+        self.start=self._hit(event)
+        self.selected=[]
+        self.on_select([])
+        self._draw_selection()
+
+    def _drag(self,event):
+        end=self._hit(event)
+        if self.start is None or end is None:
+            return
+        if not self.handle_drag and self.press_xy and max(abs(event.x-self.press_xy[0]),abs(event.y-self.press_xy[1]))<4:
+            return
+        a,b=sorted((self.start,end))
+        self.selected=list(range(a,b+1))
+        self._draw_selection()
+
+    def _release(self,event):
+        self._drag(event)
+        if not self.handle_drag and not self.selected and self.start in self.mapping:
+            block,_=self.mapping[self.start]
+            self.selected=sorted(i for i,(b,_) in self.mapping.items() if b==block)
+            self._draw_selection()
+        self._notify()
+
+    def _rect(self,index):
+        g=self.glyphs[index]
+        x,y,_,_=self.page_boxes[g.page]
+        l,t,r,b=g.box
+        return (x+l*self.scale,y+t*self.scale,x+r*self.scale,y+b*self.scale)
+
     def _draw_selection(self):
         self.canvas.delete("selection")
-        if not self.page_boxes:
+        self.handles=[]
+        if not self.page_boxes or not self.selected:
             return
+        # Merge adjacent glyph rectangles on each line, including whitespace.
+        lines=[]
         for i in self.selected:
-            g=self.glyphs[i]
-            x,y,_,_=self.page_boxes[g.page]
-            l,t,r,b=g.box
-            self.canvas.create_rectangle(x+l*self.scale,y+t*self.scale,x+r*self.scale,y+b*self.scale,
-                fill="#5b9bfa",stipple="gray25",outline="",tags=("selection",))
+            l,t,r,b=self._rect(i)
+            page=self.glyphs[i].page
+            if lines and lines[-1][0]==page and abs((t+b)/2-(lines[-1][2]+lines[-1][4])/2)<max(4,(b-t)*.5) and l<=lines[-1][3]+12:
+                old=lines[-1]
+                lines[-1]=(page,min(l,old[1]),min(t,old[2]),max(r,old[3]),max(b,old[4]))
+            else:
+                lines.append((page,l,t,r,b))
+        for _,l,t,r,b in lines:
+            self.canvas.create_rectangle(l-1,t-2,r+1,b+2,fill="#408cf5",stipple="gray50",
+                outline="#2673d9",width=1,tags=("selection",))
+        first=self._rect(self.selected[0]);last=self._rect(self.selected[-1])
+        for side,x,y,top in (("left",first[0],first[3]+9,first[1]),("right",last[2],last[3]+9,last[1])):
+            self.canvas.create_line(x,top,x,y,fill="#1565d8",width=2,tags=("selection",))
+            self.canvas.create_oval(x-6,y-6,x+6,y+6,fill="#1565d8",outline="white",width=1,tags=("selection",))
+            self.handles.append((side,x,y))
         self.canvas.tag_raise("selection")

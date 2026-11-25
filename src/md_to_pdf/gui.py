@@ -21,7 +21,7 @@ def main():
     except (ImportError, tk.TclError):
         root = tk.Tk()
         drag = False
-    root.title("MD to PDF • 0.3.0 dev")
+    root.title("MD to PDF • 0.3.0")
     root.geometry("820x680")
     root.minsize(690, 590)
     root.columnconfigure(0, weight=1)

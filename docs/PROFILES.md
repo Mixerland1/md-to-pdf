@@ -1,4 +1,4 @@
-# Brand Style Studio (development)
+# Brand Style Studio
 
 Select Granulex or a generic base in the desktop app, then choose **Edit / Стиль** to create a local editable copy. **Copy / Копировать** saves a separate profile; **New / Новый** starts with a neutral style; **Import / Импорт** opens a portable JSON profile for inspection and saving locally. Saved profiles appear in the template dropdown. Use **Предпросмотр PDF** to generate a real sample PDF to a chosen location and open it in the system viewer. **Экспорт JSON** exports all settings and the embedded logo, without the source document.
 
@@ -8,7 +8,7 @@ Profiles are stored in `~/.md-to-pdf/profiles`. Built-in styles remain unchanged
 
 Schema 1: name, base, product, seven colors, two installed font family names, body size, line height, four page margins, logo height, footer text and page numbering. Logos: self-contained SVG path-only marks are preserved as vector; PNG/JPEG are normalized and embedded in an SVG container (still raster). No arbitrary CSS or external URLs are permitted in imported profiles. Advanced SVG elements and true raster-to-vector tracing are not supported yet. Existing matching Granulex source header is stripped when applying a custom profile so the selected brand wins. Use the built-in Granulex preset to preserve embedded source metadata; use command-line or GUI fields for explicit custom profile metadata.
 
-Montserrat and Roboto Mono are bundled when scripts/fetch_fonts.py runs before installation/build; other fonts use the installed system fonts and fallbacks. Exact rendering of original corporate reference, additional corporate presets, live in-window preview, faithful DOCX layout and Windows portable build remain pending. User confirmed redistribution rights for the supplied Granulex mark only. 
+Montserrat and Roboto Mono are bundled when scripts/fetch_fonts.py runs before installation/build; other fonts use the installed system fonts and fallbacks. Exact rendering of original corporate reference, additional corporate presets, live in-window preview, faithful DOCX layout and manual platform GUI acceptance remain pending. User confirmed redistribution rights for the supplied Granulex mark only. 
 
 ## Краткая инструкция
 

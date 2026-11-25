@@ -1,13 +1,13 @@
-name: Windows portable build
+name: Desktop builds and release
 on:
   workflow_dispatch:
   push:
     branches: [main, 'develop/v0.3.0']
-    paths: ['src/**', 'tests/**', 'packaging/**', 'scripts/**', 'examples/**', 'pyproject.toml', '.github/workflows/windows.yml']
+    paths: ['src/**', 'tests/**', 'packaging/**', 'scripts/**', 'examples/**', 'pyproject.toml', '.github/workflows/windows.yml', '.github/workflows/macos.yml']
 permissions:
   contents: read
 jobs:
-  build:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,27 +28,60 @@ jobs:
           name: MD-to-PDF-Windows-x64
           path: MD-to-PDF-Windows-x64.zip
           if-no-files-found: error
-  # Publishing is separate from build: only a smoke-tested bundle can be released.
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify runner architecture
+        run: test "$(uname -m)" = "${{ matrix.arch }}"
+      - name: Build and validate app
+        run: bash packaging/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MD-to-PDF-macOS-${{ matrix.arch }}
+          path: MD-to-PDF-macOS-${{ matrix.arch }}.zip
+          if-no-files-found: error
   publish:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: build
+    if: github.ref == 'refs/heads/main'
+    needs: [windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: desktop-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: MD-to-PDF-Windows-x64
-      - name: Publish tested release
+          pattern: MD-to-PDF-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish all verified desktop bundles together
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml)
           tag="v$version"
-          sha256sum MD-to-PDF-Windows-x64.zip > SHA256SUMS.txt
+          cd release-assets
+          for file in MD-to-PDF-Windows-x64.zip MD-to-PDF-macOS-arm64.zip MD-to-PDF-macOS-x86_64.zip; do
+            test -s "$file"
+          done
+          sha256sum MD-to-PDF-*.zip > SHA256SUMS.txt
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release already exists; bump version for new binaries."
           else
-            gh release create "$tag" MD-to-PDF-Windows-x64.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --generate-notes
+            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file ../docs/RELEASE_0.3.0.md
           fi

@@ -1,9 +1,6 @@
 name: macOS portable build
 on:
   workflow_dispatch:
-  push:
-    branches: ['develop/v0.3.0', main]
-    paths: ['src/**', 'tests/**', 'packaging/**', 'scripts/**', 'examples/**', 'pyproject.toml', '.github/workflows/macos.yml']
 permissions:
   contents: read
 jobs:

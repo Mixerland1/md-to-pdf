@@ -1,4 +1,4 @@
-# Document import (0.3.0 development)
+# Document import (0.3.0)
 
 - Markdown: existing Mistune renderer and flags unchanged.
 - TXT: UTF-8 (optional BOM), UTF-16 with BOM; literal text, including line breaks and spaces. No automatic heading inference or interpretation as Markdown. Other encodings must first be saved as UTF-8.
@@ -7,7 +7,7 @@
 - Granulex preset is a development approximation of the supplied print rules, not an official approved corporate style. Montserrat and Roboto Mono use system fonts if installed; original fonts are not included. The original Granulex vector mark is included as a built-in logo supplied for this project; the existing leading HTML header can be parsed without enabling arbitrary HTML. The local library and profile editor are now implemented in the development branch; see PROFILES.md.
 - Source install in this branch: `python -m pip install ".[gui,test]"`; `md-to-pdf-gui`; `md-to-pdf a.md b.txt c.docx --template granulex`.
 
-This is not the published Windows release. Verify CI and compare visual output before integration.
+See Releases for verified platform downloads; manual GUI acceptance is pending.
 
 ## Granulex header
 

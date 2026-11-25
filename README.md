@@ -1,6 +1,6 @@
 # MD to PDF
 
-**Convert Markdown into professional PDF documents without VS Code.** Local desktop app and command-line converter. [Русская инструкция](#русская-инструкция).
+**Convert Markdown, TXT and DOCX into professional PDFs in your own brand style.** Local desktop app and command-line converter. [Русская инструкция](#русская-инструкция).
 
 ## Windows — no Python required
 
@@ -8,9 +8,13 @@
 2. Download `MD-to-PDF-Windows-x64.zip` from a published release.
 3. Extract the entire archive (do not move the EXE away from its bundled libraries).
 4. Double-click `MD-to-PDF.exe`.
-5. Drop Markdown files or folders into the window, select a template and click **Convert to PDF**.
+5. Drop MD, TXT or DOCX files or folders into the window, select a template and click **Convert to PDF**.
 
 If no release is visible yet, the [Windows build workflow](https://github.com/Mixerland1/md-to-pdf/actions/workflows/windows.yml) has not completed and published a tested bundle. Use the source installation below in the meantime. The portable bundle is unsigned; check its SHA-256 against the release checksum. Windows x64 only.
+
+## macOS — Apple Silicon and Intel
+
+Download the architecture-specific archive from [Releases](https://github.com/Mixerland1/md-to-pdf/releases): `MD-to-PDF-macOS-arm64.zip` for Apple Silicon or `MD-to-PDF-macOS-x86_64.zip` for Intel. Extract and open MD-to-PDF.app. Initial target: macOS 15. The app is ad-hoc signed, not notarized; Gatekeeper may block opening. See [platform notes](docs/PLATFORMS.md).
 
 ### Templates
 
@@ -19,12 +23,13 @@ If no release is visible yet, the [Windows build workflow](https://github.com/Mi
 | Technical | User guides, manuals, knowledge bases |
 | Business | Reports, proposals, business documents |
 | Academic | Course materials, academic reports, long-form reading |
+| Granulex | Corporate technical documentation with original SVG mark |
 
-All templates use A4, running headers and numbered pages. Add your own trusted CSS to override styling.
+All templates use A4; header and footer behavior depends on the template. Use [Brand Style Studio](docs/PROFILES.md) to create, edit, preview and exchange custom profiles. Add your own trusted CSS to override styling.
 
 ### Desktop workflow
 
-Add or drag multiple .md, .markdown or .mdown files, or whole folders. Enable Subfolders before adding a folder to search recursively. Choose an output folder or leave it blank to write each PDF next to its source. Existing PDFs are protected unless Overwrite is selected. Duplicate target names are reported rather than silently overwritten. Progress and conversion errors appear in the app. The interface uses English and Russian labels. A file picker remains available if native drag and drop is unavailable.
+Add or drag multiple .md, .markdown, .mdown, .txt or .docx files, or whole folders. Enable Subfolders before adding a folder to search recursively. Choose an output folder or leave it blank to write each PDF next to its source. Existing PDFs are protected unless Overwrite is selected. Duplicate target names are reported rather than silently overwritten. Progress and conversion errors appear in the app. The interface uses English and Russian labels. A file picker remains available if native drag and drop is unavailable.
 
 ## Install from source — Windows, macOS, Linux
 
@@ -33,6 +38,7 @@ Requires Python 3.10+ and the native WeasyPrint libraries (Pango, etc.). Follow 
 ```sh
 git clone https://github.com/Mixerland1/md-to-pdf.git
 cd md-to-pdf
+python scripts/fetch_fonts.py
 python -m pip install ".[gui]"
 md-to-pdf-gui
 ```
@@ -49,6 +55,8 @@ md-to-pdf docs --recursive --output-dir pdf
 md-to-pdf docs --recursive --overwrite
 md-to-pdf document.md --css custom.css --title "User guide"
 md-to-pdf document.md --html-only
+md-to-pdf report.docx notes.txt --template granulex
+md-to-pdf report.docx --profile my-brand.json
 md-to-pdf --help
 ```
 
@@ -62,13 +70,21 @@ By default existing output is protected; use `--overwrite` to replace it. Use an
 2. Скачайте архив **MD-to-PDF-Windows-x64.zip** из опубликованного релиза.
 3. Распакуйте архив целиком в удобную папку. Не переносите отдельно EXE из этой папки.
 4. Запустите **MD-to-PDF.exe**.
-5. Перетащите один или несколько Markdown-файлов или папку в окно программы.
-6. Выберите шаблон: **technical** (инструкции), **business** (деловые документы) или **academic** (учебные и научные материалы).
+5. Перетащите один или несколько файлов MD, TXT или DOCX или папку в окно программы.
+6. Выберите шаблон: **technical** (инструкции), **business** (деловые документы) **academic** (учебные и научные материалы) или **granulex** (фирменный стиль Granulex).
 7. При необходимости укажите папку сохранения или CSS. Нажмите **Convert to PDF / Конвертировать**.
 
-Если папка сохранения не указана, PDF появится рядом с исходным Markdown. Существующие файлы защищены от перезаписи. Для обхода вложенных папок включите «Подпапки» перед добавлением папки. Если у файлов одинаковые имена и выбрана общая папка вывода, программа предупредит о конфликте.
+Если папка сохранения не указана, PDF появится рядом с исходным документом. Существующие файлы защищены от перезаписи. Для обхода вложенных папок включите «Подпапки» перед добавлением папки. Если у файлов одинаковые имена и выбрана общая папка вывода, программа предупредит о конфликте.
 
 Если готового архива пока нет в Releases, проверьте [состояние сборки](https://github.com/Mixerland1/md-to-pdf/actions/workflows/windows.yml). Сборка публикуется только после проверки EXE. Приложение не имеет цифровой подписи; проверяйте контрольную сумму из релиза.
+
+### macOS
+
+Скачайте из Releases архив `MD-to-PDF-macOS-arm64.zip` для Apple Silicon или `MD-to-PDF-macOS-x86_64.zip` для Intel. Распакуйте его и откройте MD-to-PDF.app. Первоначальная целевая версия — macOS 15. Приложение не нотарифицировано Apple, поэтому возможны предупреждения Gatekeeper. Подробнее: [поддерживаемые платформы](docs/PLATFORMS.md).
+
+### Фирменные стили
+
+Выберите Granulex или создайте свой профиль: [инструкция по конструктору](docs/PROFILES.md). Поддерживаются смешанные пакеты MD/TXT/DOCX. DOCX переоформляется по структуре, без гарантии точного воспроизведения вёрстки Word.
 
 ### Установка из исходников
 
@@ -77,6 +93,7 @@ By default existing output is protected; use `--overwrite` to replace it. Use an
 ```powershell
 git clone https://github.com/Mixerland1/md-to-pdf.git
 cd md-to-pdf
+py scripts/fetch_fonts.py
 py -m pip install ".[gui]"
 py -m md_to_pdf.gui
 ```
@@ -99,11 +116,7 @@ See [feature comparison, methodology and benchmark instructions](benchmark/READM
 
 ## Roadmap / Дальнейшее развитие
 
-See [product roadmap](docs/ROADMAP.md) for planned TXT/DOCX input, corporate profiles (Granulex first), and a visual style constructor. These features are under development for 0.3.0; the stable release remains 0.2.0.
-
-## Development branch — Brand Style Studio 0.3.0
-
-The next version supports Markdown, TXT and semantic DOCX import, Granulex branding and a local profile editor with logo import, colors, fonts, page margins, footer and PDF preview. These features are not yet in the stable 0.2.0 Windows release. See [document import](docs/IMPORTS.md), [brand profile instructions / Конструктор стилей](docs/PROFILES.md) and [Granulex visual QA](docs/GRANULEX_QA.md). Run `python scripts/fetch_fonts.py` before installing from this branch to package the verified public fonts.
+See [product roadmap](docs/ROADMAP.md) for future corporate profiles, broader SVG support and faithful Word layout. Version 0.3.0 adds the local profile editor and cross-platform builds. See [release notes](docs/RELEASE_0.3.0.md), [document import](docs/IMPORTS.md), [brand profile instructions](docs/PROFILES.md) and [Granulex visual QA](docs/GRANULEX_QA.md).
 
 ## Development
 
@@ -112,8 +125,8 @@ python -m pip install ".[test,gui]"
 python -m unittest discover -s tests -v
 ```
 
-Version 0.2.0. Reconstructed from an incomplete earlier prototype, not a byte-for-byte recovery. License: ISC.
+Version 0.3.0. Reconstructed from an incomplete earlier prototype, not a byte-for-byte recovery. License: ISC.
 
-### Planned desktop builds (0.3.0)
+### Desktop builds
 
-Windows x64 and macOS Apple Silicon / Intel test builds are configured in the development branch. See [platform notes](docs/PLATFORMS.md). These are not yet published stable binaries.
+The [combined workflow](https://github.com/Mixerland1/md-to-pdf/actions/workflows/windows.yml) publishes a release only when Windows and both Mac builds pass. See [platform notes](docs/PLATFORMS.md).

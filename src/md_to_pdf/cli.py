@@ -1,4 +1,4 @@
-"""Convert local Markdown files to paginated PDF or standalone HTML."""
+"""Convert local Markdown, TXT and DOCX files to paginated PDF or standalone HTML."""
 from __future__ import annotations
 
 import argparse
@@ -10,8 +10,9 @@ import sys
 from urllib.parse import urlsplit, unquote
 
 import mistune
+from .inputs import source_html
 
-TEMPLATES = ('technical', 'business', 'academic')
+TEMPLATES = ('technical', 'business', 'academic', 'granulex')
 
 
 class DocumentRenderer(mistune.HTMLRenderer):
@@ -38,7 +39,7 @@ def render_html(source: Path, *, title: str | None = None,
     document_date = document_date or date.today().strftime("%d.%m.%Y")
     markdown = mistune.create_markdown(renderer=DocumentRenderer(allow_html=allow_html),
                                       plugins=["table", "strikethrough", "task_lists", "footnotes", "url"])
-    content = markdown(source.read_text(encoding="utf-8-sig"))
+    content = source_html(source, markdown)
     style = Path(__file__).with_name("print.css").read_text(encoding="utf-8")
     if template not in TEMPLATES:
         raise ValueError(f"Unknown template: {template}")
@@ -94,7 +95,7 @@ def convert(source: Path, output: Path, *, title: str | None = None,
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path, nargs="+", help="Markdown files or folders")
+    parser.add_argument("source", type=Path, nargs="+", help="Markdown, TXT, DOCX files or folders")
     parser.add_argument("--recursive", action="store_true", help="Include subfolders")
     parser.add_argument("--output-dir", type=Path, help="Output folder for batch conversion")
     parser.add_argument("--overwrite", action="store_true", help="Allow replacing existing outputs")
@@ -104,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--title", help="Document title (default: filename without extension)")
     parser.add_argument("--date", help="Footer date (default: today, DD.MM.YYYY)")
     parser.add_argument("--html-only", action="store_true", help="Export HTML rather than PDF")
-    parser.add_argument("--allow-html", action="store_true", help="Allow raw HTML in trusted Markdown")
+    parser.add_argument("--allow-html", action="store_true", help="Allow raw HTML in trusted Markdown (not TXT or DOCX)")
     args = parser.parse_args(argv)
     from .batch import collect_sources, plan_outputs
     try:

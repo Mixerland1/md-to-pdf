@@ -19,7 +19,7 @@ def main():
     except (ImportError, tk.TclError):
         root = tk.Tk()
         drag = False
-    root.title("MD to PDF • 0.2.0")
+    root.title("MD to PDF • 0.3.0 dev")
     root.geometry("820x570")
     root.minsize(650, 460)
     root.columnconfigure(0, weight=1)
@@ -29,7 +29,7 @@ def main():
     panel.columnconfigure(0, weight=1)
     panel.rowconfigure(3, weight=1)
     ttk.Label(panel, text="MD to PDF", font=("Segoe UI", 24, "bold")).grid(sticky="w")
-    ttk.Label(panel, text="Local Markdown conversion / Локальная конвертация Markdown").grid(sticky="w", pady=(0, 12))
+    ttk.Label(panel, text="MD · TXT · DOCX → PDF").grid(sticky="w", pady=(0, 12))
     queuebox = tk.Listbox(panel, selectmode="extended", height=8, font=("Segoe UI", 10))
     queuebox.grid(row=3, column=0, sticky="nsew", pady=8)
     sources = []
@@ -65,7 +65,7 @@ def main():
             sources.clear()
             queuebox.delete(0, "end")
             status.set("Ready / Готово")
-    drop = ttk.Label(panel, text=("Drop Markdown files or folders here / Перетащите файлы или папки"
+    drop = ttk.Label(panel, text=("Drop documents or folders here / Перетащите файлы или папки"
                                 if drag else "Add files using the buttons / Добавьте файлы кнопками"),
                      anchor="center", padding=18, relief="groove")
     drop.grid(row=2, sticky="ew")
@@ -80,7 +80,7 @@ def main():
         controls.append(w)
         return w
     button(tools, "Add files / Файлы", lambda: add(filedialog.askopenfilenames(
-        filetypes=[("Markdown", "*.md *.markdown *.mdown"), ("All files", "*.*")]))).pack(side="left")
+        filetypes=[("Documents", "*.md *.markdown *.mdown *.txt *.docx"), ("Markdown", "*.md *.markdown *.mdown"), ("Text", "*.txt"), ("Word", "*.docx"), ("All files", "*.*")]))).pack(side="left")
     button(tools, "Folder / Папка", lambda: add([p] if (p := filedialog.askdirectory()) else [])).pack(side="left", padx=4)
     button(tools, "Remove / Удалить", remove).pack(side="left", padx=4)
     button(tools, "Clear / Очистить", clear).pack(side="left")
@@ -120,7 +120,7 @@ def main():
             return
         try:
             if not sources:
-                raise ValueError("Add at least one Markdown file")
+                raise ValueError("Add at least one document")
             jobs = plan_outputs(sources, output_dir=directory.get().strip() or None, overwrite=overwrite.get())
             custom = Path(css.get().strip()) if css.get().strip() else None
             if custom and not custom.is_file():

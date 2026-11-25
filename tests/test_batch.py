@@ -29,7 +29,7 @@ class BatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp).resolve(); a = root / "a.md"; b = root / "b.md"
             a.write_text("# Alpha"); b.write_text("# Beta")
-            self.assertEqual(len({render_html(a, template=t) for t in TEMPLATES}), 3)
+            self.assertEqual(len({render_html(a, template=t) for t in TEMPLATES}), len(TEMPLATES))
             self.assertEqual(main([str(root), "--template", "business"]), 0)
             for p in (a, b):
                 self.assertTrue(PdfReader(p.with_suffix(".pdf")).pages)

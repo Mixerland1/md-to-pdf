@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "md-to-pdf"
-version = "0.2.0"
+version = "0.3.0.dev0"
 description = "Standalone Markdown-to-PDF converter for technical documents"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "ISC"}
-dependencies = ["mistune>=3.2,<4", "weasyprint>=68,<69"]
+dependencies = ["mistune>=3.2,<4", "weasyprint>=68,<69", "mammoth>=1.11,<2", "bleach>=6,<7"]
 
 [project.optional-dependencies]
-test = ["pypdf>=5,<7"]
+test = ["pypdf>=5,<7", "python-docx>=1.1,<2"]
 gui = ["tkinterdnd2>=0.4,<1"]
 build = ["tkinterdnd2>=0.4,<1", "pyinstaller>=6.11,<7"]
 

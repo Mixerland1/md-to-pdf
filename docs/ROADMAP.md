@@ -4,8 +4,8 @@
 MD to PDF remains the product name. The goal is local conversion of documents into consistent, professional PDFs without VS Code or a mandatory cloud service. Preserve CLI and batch workflows, and support portable Windows builds. Keep the stable 0.2.0 release available while developing 0.3.0 on a separate branch.
 
 ## Delivery stages
-- [ ] A — Input adapters: Markdown, TXT, DOCX; common semantic HTML pipeline; mixed-format batch and desktop file selection.
-- [ ] B — Brand profile schema and built-in Granulex preset, based on supplied CSS/settings. Preserve layout, typography, palette, tables, lists, code and quotes; document renderer differences.
+- [ ] A — Implementation committed on development branch; CI pending. Input adapters: Markdown, TXT, DOCX; common semantic HTML pipeline; mixed-format batch and desktop file selection.
+- [ ] B — Initial Granulex typography preset committed; exact fidelity, fonts and logo pending. Brand profile schema and built-in Granulex preset, based on supplied CSS/settings. Preserve layout, typography, palette, tables, lists, code and quotes; document renderer differences.
 - [ ] C — SVG logo extraction/import, duplicate prevention, and local profile persistence; PNG/JPEG embedded in SVG is raster, not vector tracing. Keep vector paths for original SVG. Sanitize SVG, disallow scripts, external assets and unsafe references.
 - [ ] D — Visual brand constructor: name, logo, colors, fonts, spacing, margins, header/footer, page numbering, table styles, preview, export/import profiles. Never require company docs to be published.
 - [ ] E — Additional corporate presets after verification of branding and redistribution rights; distinguish official from unofficial profiles. Do not distribute proprietary fonts/logos without permission.

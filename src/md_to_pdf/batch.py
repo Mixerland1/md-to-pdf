@@ -1,7 +1,7 @@
 """Deterministic input discovery and non-destructive output planning."""
 from pathlib import Path
 
-EXTENSIONS = {".md", ".markdown", ".mdown"}
+from .inputs import EXTENSIONS
 
 
 def collect_sources(inputs, *, recursive=False):
@@ -14,15 +14,15 @@ def collect_sources(inputs, *, recursive=False):
         elif path.is_file() and path.suffix.lower() in EXTENSIONS:
             candidates = [path]
         else:
-            raise ValueError(f"Not a Markdown file or folder: {path}")
+            raise ValueError(f"Not a supported document or folder: {path}")
         for candidate in candidates:
-            if candidate.is_file() and candidate.suffix.lower() in EXTENSIONS:
+            if candidate.is_file() and candidate.suffix.lower() in EXTENSIONS and not candidate.name.startswith("~$"):
                 candidate = candidate.resolve()
                 if candidate not in seen:
                     seen.add(candidate)
                     sources.append(candidate)
     if not sources:
-        raise ValueError("No Markdown files found")
+        raise ValueError("No supported documents found")
     return sources
 
 

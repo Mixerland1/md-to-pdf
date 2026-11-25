@@ -70,3 +70,24 @@ class WorkspaceTests(unittest.TestCase):
                 w.save_pasted(target,"Granulex")
             with self.assertRaises(ValueError):
                 Workspace.from_clipboard(" \n",root,template="technical")
+
+    def test_list_style_real_pdf_and_saved_project(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/"list.md"
+            p.write_text("# Title\n\n4. First\n5. Second\n6. Third\n",encoding="utf-8")
+            w=Workspace(p,template="granulex")
+            self.assertEqual(w.model.selection_role([(2,0,3)]),"numbered")
+            data,ids,texts,locations=render_snapshot(w.snapshot())
+            with pdfium.PdfDocument(data) as doc:
+                _,mapping=map_glyphs(doc,ids,texts,locations)
+                self.assertTrue(any(i==2 for i,_ in mapping.values()))
+            w.apply("h2",[(2,0,3)])
+            data,ids,texts,locations=render_snapshot(w.snapshot())
+            with pdfium.PdfDocument(data) as doc:
+                _,mapping=map_glyphs(doc,ids,texts,locations)
+                self.assertTrue(any(i==2 for i,_ in mapping.values()))
+            self.assertEqual(w.model.selection_role([(2,0,3)]),"h2")
+            w.save("Granulex")
+            restored=Workspace(p,template="granulex")
+            restored.restore()
+            self.assertEqual(restored.model.selection_role([(2,0,3)]),"h2")

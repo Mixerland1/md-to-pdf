@@ -20,6 +20,7 @@ from .page_preview import PagePreview
 
 BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex"}
 STYLES={"Текст":"normal","Заголовок 1":"h1","Заголовок 2":"h2","Заголовок 3":"h3",
+        "Маркированный список":"bullet","Нумерованный список":"numbered","Заголовок 4":"h4","Заголовок 5":"h5","Заголовок 6":"h6",
         "Цитата":"quote","Примечание":"note","Предупреждение":"warning","Блок кода":"code-block",
         "Полужирный":"bold","Курсив":"italic","Код":"code","Акцент":"accent"}
 
@@ -84,8 +85,32 @@ def main():
     font_box.pack(side="left",padx=(0,3))
     size_box=ttk.Combobox(editor_bar,textvariable=size,values=("6","7","8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"),width=5,style="Toolbar.TCombobox")
     size_box.pack(side="left",padx=(0,3))
-    brush_button=ttk.Button(editor_bar,text="Кисть",width=6,style="Toolbar.TButton",command=lambda:brush())
+    brush_icon=tk.PhotoImage(master=root,width=20,height=20)
+    # Small original pixel icon: a diagonally oriented paintbrush.
+    for y,x0,x1,color in ((2,13,16,"#314e71"),(3,12,17,"#314e71"),(4,11,17,"#314e71"),(5,10,16,"#314e71"),(6,9,15,"#314e71"),(7,8,14,"#314e71"),(8,7,13,"#314e71"),(9,6,12,"#e3a64b"),(10,5,11,"#e3a64b"),(11,4,10,"#e3a64b"),(12,3,9,"#e3a64b"),(13,3,8,"#e3a64b"),(14,2,7,"#bd7b35"),(15,2,6,"#bd7b35"),(16,1,4,"#314e71")):
+        brush_icon.put(color,to=(x0,y,x1+1,y+1))
+    brush_button=ttk.Button(editor_bar,image=brush_icon,text="Формат по образцу",style="Toolbar.TButton",command=lambda:brush())
+    brush_button.image=brush_icon
+    def tooltip(widget,label):
+        tip=[None]
+        pending=[None]
+        def hide(_=None):
+            if pending[0] is not None:
+                widget.after_cancel(pending[0]);pending[0]=None
+            if tip[0] is not None:
+                tip[0].destroy();tip[0]=None
+        def show():
+            pending[0]=None
+            tip[0]=tk.Toplevel(root)
+            tip[0].wm_overrideredirect(True)
+            tip[0].wm_geometry(f"+{widget.winfo_rootx()}+{widget.winfo_rooty()+widget.winfo_height()+5}")
+            ttk.Label(tip[0],text=label,padding=6,relief="solid").pack()
+        widget.bind("<Enter>",lambda e:pending.__setitem__(0,widget.after(600,show)))
+        widget.bind("<Leave>",hide)
+        widget.bind("<ButtonPress>",hide,add="+")
+    tooltip(brush_button,"Формат по образцу")
     brush_button.pack(side="left",padx=(0,4))
+    editor_paste=ttk.Button(bar,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     save_button=ttk.Button(bar,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
 
     ttk.Button(editor_bar,text="↶",width=3,style="Toolbar.TButton",command=lambda:history(False)).pack(side="left")
@@ -136,20 +161,70 @@ def main():
             return
         show_workspace(ws,pasted=False)
 
-    def paste(_=None):
-        if state["updating"] or not discard_ok():
+    def paste(_=None, fresh=False):
+        if state["updating"]:
             return
-        try:
-            text=root.clipboard_get()
-        except tk.TclError:
-            messagebox.showinfo("Вставить текст","В буфере обмена нет текста.",parent=root)
-            return
-        try:
-            ws=Workspace.from_clipboard(text,clipboard_dir.name,**options())
-        except Exception as exc:
-            messagebox.showerror("Вставить текст",str(exc),parent=root)
-            return
-        show_workspace(ws,pasted=True)
+        previous=state["workspace"]
+        current_text=None
+        if state["pasted"] and previous:
+            current_text=previous.source.read_text(encoding="utf-8")
+        def clipboard():
+            try:
+                return root.clipboard_get()
+            except tk.TclError:
+                return ""
+        initial=current_text if current_text is not None and not fresh else clipboard()
+        dialog=tk.Toplevel(root)
+        dialog.title("Вставить текст")
+        dialog.transient(root)
+        dialog.geometry("700x460")
+        dialog.minsize(400,260)
+        dialog.columnconfigure(0,weight=1)
+        dialog.rowconfigure(0,weight=1)
+        area=ttk.Frame(dialog,padding=10)
+        area.grid(row=0,sticky="nsew")
+        area.columnconfigure(0,weight=1)
+        area.rowconfigure(0,weight=1)
+        field=tk.Text(area,wrap="word",undo=True,exportselection=False,padx=10,pady=10)
+        field.grid(row=0,column=0,sticky="nsew")
+        scroll=ttk.Scrollbar(area,orient="vertical",command=field.yview)
+        scroll.grid(row=0,column=1,sticky="ns")
+        field.configure(yscrollcommand=scroll.set)
+        field.insert("1.0",initial)
+        field.edit_reset()
+        actions=ttk.Frame(dialog,padding=(10,0,10,10))
+        actions.grid(row=1,sticky="ew")
+        def refill():
+            value=clipboard()
+            if value:
+                field.delete("1.0","end")
+                field.insert("1.0",value)
+            field.focus_set()
+        ttk.Button(actions,text="Из буфера",command=refill).pack(side="left")
+        ttk.Button(actions,text="Очистить",command=lambda:field.delete("1.0","end")).pack(side="left",padx=5)
+        def accept():
+            value=field.get("1.0","end-1c")
+            if not value.strip():
+                messagebox.showinfo("Вставить текст","Введите или вставьте текст.",parent=dialog)
+                return
+            if current_text is not None and value==current_text:
+                dialog.destroy()
+                return
+            if previous and (state["dirty"] or previous.actions):
+                if not messagebox.askyesno("Заменить документ","Заменить текст? Правки оформления текущего документа не переносятся.",parent=dialog):
+                    return
+            try:
+                ws=Workspace.from_clipboard(value,clipboard_dir.name,**options())
+            except Exception as exc:
+                messagebox.showerror("Вставить текст",str(exc),parent=dialog)
+                return
+            dialog.destroy()
+            show_workspace(ws,pasted=True)
+        ttk.Button(actions,text="Отмена",command=dialog.destroy).pack(side="right")
+        ttk.Button(actions,text="Открыть в редакторе",style="Accent.TButton",command=accept).pack(side="right",padx=5)
+        dialog.bind("<Escape>",lambda e:dialog.destroy())
+        dialog.grab_set()
+        field.focus_set()
 
     def paste_shortcut(event):
         # Native paste inside font/size/header entry fields must keep working.
@@ -157,24 +232,29 @@ def main():
             return
         if event.widget.winfo_toplevel()!=root:
             return
-        paste()
+        paste(fresh=True)
         return "break"
 
     def show_workspace(ws,pasted):
         state.update(workspace=ws,dirty=pasted,pasted=pasted,paste_pdf=None,result=None,
                      selection=[],brush=None,restore_selection=[])
-        brush_button.configure(text="Кисть")
+        brush_button.configure(style="Toolbar.TButton")
         update_fields()
         empty.grid_remove()
         chrome.grid(row=0,sticky="ew")
         if not open_button.winfo_manager():
             open_button.pack(side="left",before=editor_bar) if editor_bar.winfo_manager() else open_button.pack(side="left")
+        if not editor_paste.winfo_manager():
+            editor_paste.pack(side="left",padx=(4,0))
+        editor_paste.configure(text="Изменить текст" if pasted else "Вставить текст")
         editor_bar.pack(side="left")
         export_button.pack(side="right")
         save_button.pack(side="right",padx=4)
         preview.grid(row=1,sticky="nsew")
         render()
     def select(ranges):
+        if state["rendering"]:
+            return
         state["selection"]=ranges or []
         update_fields()
         if ranges is None:
@@ -256,8 +336,8 @@ def main():
             state["dirty"]=True
             render(preserve=True)
         except (ValueError,TypeError) as exc:
-            message(str(exc))
             update_fields()
+            message(str(exc))
     styles.bind("<<ComboboxSelected>>",apply)
     def font_change(_=None):
         value=font.get().strip()
@@ -271,22 +351,28 @@ def main():
     font_box.bind("<Return>",font_change)
     size_box.bind("<<ComboboxSelected>>",size_change)
     size_box.bind("<Return>",size_change)
+    def cancel_brush(_=None):
+        state["brush"]=None
+        brush_button.configure(style="Toolbar.TButton")
+        preview.canvas.configure(cursor="")
+        if status.get().startswith("Формат по образцу"):
+            message()
     def brush():
         if state["brush"]:
-            state["brush"]=None
-            brush_button.configure(text="Кисть")
+            cancel_brush()
             return
         if not state["selection"]:
             message("Выделите образец оформления.")
             return
-        style=STYLES.get(role.get())
         family,points=preview.selection_format()
-        if not style or family in ("","Разные") or points in ("","Разные"):
-            message("Для кисти выберите фрагмент с единым оформлением.")
+        try:
+            state["brush"]=state["workspace"].model.sample(state["selection"],display_family(family),points,preview.selection_color())
+        except (ValueError,TypeError) as exc:
+            message("Формат по образцу: "+str(exc))
             return
-        state["brush"]=[style,"font:"+display_family(family),"size:"+points]
-        brush_button.configure(text="Кисть ✓")
-        message("Выберите фрагмент, к которому применить оформление.")
+        brush_button.configure(style="Accent.TButton")
+        preview.canvas.configure(cursor="crosshair")
+        message("Формат по образцу: выберите другой фрагмент.")
     def save():
         if not state["workspace"] or state["updating"]:
             return
@@ -299,6 +385,7 @@ def main():
                     return
                 ws.save_pasted(name,preset.get())
                 state["pasted"]=False
+                editor_paste.configure(text="Вставить текст")
                 state["paste_pdf"]=None
                 state["dirty"]=False
                 render(preserve=True)
@@ -367,7 +454,7 @@ def main():
         ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=6,pady=6)
         dialog.grab_set()
     if drag:
-        for widget in (root,empty,welcome,drop,paste_button,preview.canvas):
+        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas):
             widget.drop_target_register(DND_FILES)
             def dropped(event):
                 paths=root.tk.splitlist(event.data)
@@ -449,6 +536,7 @@ def main():
         preview.close()
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
+    root.bind("<Escape>",cancel_brush)
     root.bind("<Control-o>",lambda e:choose())
     root.bind("<Control-v>",paste_shortcut)
     if sys.platform=="darwin":

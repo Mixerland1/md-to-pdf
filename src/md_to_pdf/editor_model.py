@@ -5,13 +5,17 @@ from dataclasses import dataclass
 from lxml import html, etree
 from .profiles import FONT
 import math
+import json
+import re
+from copy import deepcopy
 
 INLINE_STYLES = {"bold": ("strong", ""), "italic": ("em", ""),
                  "code": ("code", ""), "accent": ("span", "brand-accent")}
 BLOCK_STYLES = {"normal": ("p", ""), "h1": ("h1", ""), "h2": ("h2", ""),
                 "h3": ("h3", ""), "quote": ("blockquote", ""),
                 "note": ("p", "editor-note"), "warning": ("p", "editor-warning"),
-                "code-block": ("pre", "")}
+                "code-block": ("pre", ""), "bullet": ("li", ""), "numbered": ("li", ""),
+                "h4": ("h4", ""), "h5": ("h5", ""), "h6": ("h6", "")}
 BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "blockquote",
               "li", "td", "th", "div"}
 EDITOR_CLASSES = {"editor-note", "editor-warning"}
@@ -49,13 +53,15 @@ def _text_slots(node):
             yield child, "tail", child.tail
 
 
-def _wrap_slot(node, attr, start, end, tag, cls, css=None):
+def _wrap_slot(node, attr, start, end, tag, cls, css=None, mark=None):
     value = getattr(node, attr)
     wrapper = etree.Element(tag)
     if cls:
         wrapper.set("class", cls)
     if css:
         wrapper.set("style", css)
+    if mark:
+        wrapper.set("data-editor-format", mark)
     wrapper.text = value[start:end]
     wrapper.tail = value[end:]
     setattr(node, attr, value[:start])
@@ -64,6 +70,112 @@ def _wrap_slot(node, attr, start, end, tag, cls, css=None):
     else:
         parent = node.getparent()
         parent.insert(parent.index(node) + 1, wrapper)
+
+
+def _split_container(child):
+    """Lift one direct child out, keeping its preceding/following siblings in
+    separate containers. Preserve ordered-list numbering, attrs and tails."""
+    container=child.getparent()
+    outer=container.getparent()
+    if outer is None:
+        raise ValueError("Не удалось преобразовать блок")
+    children=list(container)
+    index=children.index(child)
+    before,after=children[:index],children[index+1:]
+    position=outer.index(container)
+    trailing=container.tail
+    container.tail=None
+    if after:
+        right=etree.Element(container.tag,attrib=dict(container.attrib))
+        right.attrib.pop("id",None)
+        if container.tag=="ol":
+            try:
+                first=int(container.get("start","1"))
+            except ValueError:
+                first=1
+            right.set("start",str(first+index+1))
+        for sibling in after:
+            right.append(sibling)
+        right.tail=trailing
+    else:
+        right=None
+    container.remove(child)
+    if not before:
+        outer.remove(container)
+    else:
+        position+=1
+    outer.insert(position,child)
+    if right is not None:
+        outer.insert(position+1,right)
+    else:
+        child.tail=(child.tail or "")+(trailing or "")
+    return child
+
+
+def _list_item(node):
+    parent=node.getparent()
+    if node.tag=="li" and parent is not None and parent.tag in ("ul","ol"):
+        return node
+    if node.tag=="p" and parent is not None and parent.tag=="li" and len(parent)==1 and not (parent.text or "").strip():
+        return parent
+    return None
+
+
+def _role_change(node,style):
+    tag,cls=BLOCK_STYLES[style]
+    item=_list_item(node)
+    desired="ul" if style=="bullet" else "ol" if style=="numbered" else None
+    if item is not None:
+        container=item.getparent()
+        if desired==container.tag:
+            return
+        if item is not node:
+            # A loose list item containing just a paragraph can be flattened
+            # without changing the visible text or dropping inline children.
+            item.text=node.text
+            for child in list(node):
+                item.append(child)
+            for key,value in node.attrib.items():
+                if key!="id" or "id" not in item.attrib:
+                    item.set(key,value)
+            item.remove(node)
+            node=item
+        _split_container(node)
+    elif node.getparent() is not None and node.getparent().tag=="blockquote" and style!="quote":
+        _split_container(node)
+    elif node.getparent() is not None and node.getparent().tag=="blockquote" and style=="quote":
+        return
+    node.tag=tag
+    classes=[c for c in (node.get("class") or "").split() if c not in EDITOR_CLASSES]
+    if cls:
+        classes.append(cls)
+    if classes:
+        node.set("class"," ".join(classes))
+    else:
+        node.attrib.pop("class",None)
+    if desired:
+        parent=node.getparent()
+        index=parent.index(node)
+        tail=node.tail
+        node.tail=None
+        wrapper=etree.Element(desired)
+        parent.insert(index,wrapper)
+        wrapper.append(node)
+        wrapper.tail=tail
+        # Adjacent lists with matching kind form one list.
+        previous=wrapper.getprevious()
+        if previous is not None and previous.tag==desired and not (previous.tail or "").strip():
+            previous.append(node)
+            previous.tail=wrapper.tail
+            parent.remove(wrapper)
+            wrapper=previous
+        following=wrapper.getnext()
+        if following is not None and following.tag==desired and not (wrapper.tail or "").strip():
+            if desired=="ul" or following.get("start") is None:
+                for sibling in list(following):
+                    wrapper.append(sibling)
+                wrapper.tail=following.tail
+                parent.remove(following)
 
 
 class DocumentEditor:
@@ -102,8 +214,14 @@ class DocumentEditor:
             role = "note" if "editor-note" in classes else "warning" if "editor-warning" in classes else n.tag
             if role=="p" and any(a.tag=="blockquote" for a in n.iterancestors()):
                 role="blockquote"
-            locked = n.tag in {"li", "td", "th"} or any(
-                a.tag in {"ul", "ol", "table", "blockquote", "li", "td", "th"} for a in n.iterancestors())
+            item=_list_item(n)
+            if item is not None:
+                role="bullet" if item.getparent().tag=="ul" else "numbered"
+            locked = n.tag in {"td","th"} or any(a.tag in {"table","td","th"} for a in n.iterancestors())
+            if item is None and any(a.tag in {"ul","ol","li"} for a in n.iterancestors()):
+                locked=True
+            if any(a.tag=="blockquote" for a in n.iterancestors()) and n.getparent().tag!="blockquote":
+                locked=True
             result.append(Block("".join(n.itertext()), n.tag, role, locked))
         return result
 
@@ -116,9 +234,13 @@ class DocumentEditor:
             lineage = [parent, *parent.iterancestors()]
             tags = {el.tag for el in lineage}
             classes = {cls for el in lineage for cls in (el.get("class") or "").split()}
-            result.append((value, "strong" in tags or "b" in tags,
-                           "em" in tags or "i" in tags, "code" in tags or "pre" in tags,
-                           "brand-accent" in classes))
+            flags=("strong" in tags or "b" in tags,
+                   "em" in tags or "i" in tags, "code" in tags or "pre" in tags,
+                   "brand-accent" in classes)
+            explicit=next((el.get("data-editor-format") for el in lineage if el.get("data-editor-format") is not None),None)
+            if explicit is not None and re.fullmatch("[01]{4}",explicit):
+                flags=tuple(c=="1" for c in explicit)
+            result.append((value,*flags))
         return result
 
     def html(self):
@@ -197,11 +319,52 @@ class DocumentEditor:
                 pos += len(value)
         return roles[0] if roles and all(x==roles[0] for x in roles) else "mixed" if roles else ""
 
+    def sample(self,ranges,family,points,color=None):
+        """Capture a uniform role plus visible typography; copy no text."""
+        if not ranges:
+            raise ValueError("Выделите образец оформления")
+        roles=set()
+        flags=set()
+        for i,a,b in ranges:
+            role=self.blocks()[i].role
+            roles.add({"p":"normal","div":"normal","blockquote":"quote","pre":"code-block"}.get(role,role))
+            pos=0
+            for value,*marks in self.runs(i):
+                if pos<b and pos+len(value)>a:
+                    flags.add(tuple(marks))
+                pos+=len(value)
+        if len(roles)!=1 or len(flags)!=1 or next(iter(roles)) not in BLOCK_STYLES:
+            raise ValueError("Выберите фрагмент с единым оформлением")
+        if not FONT.fullmatch(family):
+            raise ValueError("Не удалось определить шрифт образца")
+        size=float(points)
+        if not math.isfinite(size) or not 5<=size<=72:
+            raise ValueError("Не удалось определить размер образца")
+        return "sample:"+json.dumps(dict(role=next(iter(roles)),font=family,size=size,
+                   marks="".join("1" if v else "0" for v in next(iter(flags))),color=color),
+                   ensure_ascii=False,separators=(",",":"))
+
     def apply(self, style, ranges):
         """Ranges are (block index, start, end) in Python Unicode characters."""
         nodes = self._nodes()
         css = None
-        if style.startswith("font:"):
+        mark = None
+        sample = None
+        if style.startswith("sample:"):
+            sample=json.loads(style[7:])
+            role=sample["role"]
+            family=sample["font"]
+            size=float(sample["size"])
+            mark=sample["marks"]
+            color=sample.get("color")
+            if role not in BLOCK_STYLES or not FONT.fullmatch(family) or not math.isfinite(size) or not 5<=size<=72 or not re.fullmatch("[01]{4}",mark):
+                raise ValueError("Недопустимый образец оформления")
+            if color is not None and not re.fullmatch(r"#[0-9a-fA-F]{6}",color):
+                raise ValueError("Недопустимый цвет образца")
+            css=f'font-family: "{family}", sans-serif; font-size: {size:g}pt; font-weight: '+("bold" if mark[0]=="1" or role.startswith("h") else "normal")+"; font-style: "+("italic" if mark[1]=="1" else "normal")
+            if color:
+                css+="; color: "+color
+        elif style.startswith("font:"):
             family = style[5:]
             if not FONT.fullmatch(family):
                 raise ValueError("Недопустимое название шрифта")
@@ -225,24 +388,20 @@ class DocumentEditor:
             spans[index] = (start, end)
         if not spans:
             raise ValueError("Select text first")
-        if style in BLOCK_STYLES:
+        if style in BLOCK_STYLES or sample is not None:
             blocks = self.blocks()
             if any(blocks[i].locked for i in spans):
-                raise ValueError("Paragraph styles cannot replace table cells, list items or nested quotes")
+                raise ValueError("Для этой ячейки таблицы или сложного вложенного блока доступны только символьные стили, шрифт и размер.")
         self._checkpoint()
         for i, (start, end) in spans.items():
             node = nodes[i]
             if style in BLOCK_STYLES:
-                tag, cls = BLOCK_STYLES[style]
-                node.tag = tag
-                classes = [c for c in (node.get("class") or "").split() if c not in EDITOR_CLASSES]
-                if cls:
-                    classes.append(cls)
-                if classes:
-                    node.set("class", " ".join(classes))
-                else:
-                    node.attrib.pop("class", None)
+                _role_change(node,style)
             else:
+                if sample is not None:
+                    _role_change(node,sample["role"])
+                    # Block indices and text remain stable for supported transformations.
+                    node=self._nodes()[i]
                 tag, cls = ("span","") if css else INLINE_STYLES[style]
                 pos = 0
                 changes = []
@@ -252,4 +411,4 @@ class DocumentEditor:
                         changes.append((owner, attr, a, b))
                     pos += len(text)
                 for owner, attr, a, b in reversed(changes):
-                    _wrap_slot(owner, attr, a, b, tag, cls, css)
+                    _wrap_slot(owner, attr, a, b, tag, cls, css, mark)

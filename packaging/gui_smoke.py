@@ -21,7 +21,7 @@ root=tk.Tk()
 try:
     with tempfile.TemporaryDirectory() as d:
         source=Path(d)/"guide.md"
-        source.write_text("# Руководство\n\nExample text.",encoding="utf-8")
+        source.write_text("# Руководство\n\nExample text.\n\n- First item\n- Second item",encoding="utf-8")
         with patch.object(gui.tk,"Tk",return_value=root),patch.object(root,"mainloop"),patch.object(gui,"list_profiles",return_value={}),patch.object(gui.filedialog,"askopenfilename",return_value=str(source)):
             gui.main()
             root.update()
@@ -54,6 +54,19 @@ try:
                 time.sleep(.05)
             assert role.get()=="Заголовок 2",role.get()
             assert preview.selected,"Selection lost after reflow"
+            idx=next(i for i,(block,offset) in preview.mapping.items() if block==2)
+            l,t,r,b=preview._rect(idx)
+            event=SimpleNamespace(x=(l+r)/2-preview.canvas.canvasx(0),y=(t+b)/2-preview.canvas.canvasy(0))
+            preview._press(event);preview._release(event)
+            assert role.get()=="Маркированный список",role.get()
+            role.set("Текст")
+            role.event_generate("<<ComboboxSelected>>")
+            root.update()
+            deadline=time.monotonic()+30
+            while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
+                root.update();time.sleep(.05)
+            assert role.get()=="Текст",role.get()
+            assert preview.selected
             buttons(root)["Сохранить"].invoke()
             assert source.with_name(source.name+".mdtopdf").is_file()
             assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
@@ -63,11 +76,18 @@ try:
             root.clipboard_clear()
             root.clipboard_append("# Из буфера\n\nНовый текст.")
             buttons(root)["Вставить текст"].invoke()
+            dialog=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
+            field=next(w for w in descendants(dialog) if isinstance(w,tk.Text))
+            assert "Новый текст" in field.get("1.0","end")
+            field.delete("1.0","end")
+            field.insert("1.0","# Из буфера\n\nИсправленный текст.")
+            with patch.object(gui.messagebox,"askyesno",return_value=True):
+                buttons(dialog)["Открыть в редакторе"].invoke()
             deadline=time.monotonic()+30
             while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
                 root.update()
                 time.sleep(.05)
-            assert any("Новый" in t for t in ["".join(g.char for g in preview.glyphs)]),"Pasted text missing"
+            assert any("Исправленный" in t for t in ["".join(g.char for g in preview.glyphs)]),"Pasted text missing"
             with patch.object(gui.filedialog,"asksaveasfilename",return_value=str(Path(d)/"clipboard.pdf")):
                 buttons(root)["Экспорт PDF"].invoke()
             assert (Path(d)/"clipboard.pdf").is_file()

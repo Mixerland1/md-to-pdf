@@ -25,7 +25,7 @@ LABELS = {
 
 def edit_profile(parent, *, initial=None, existing=None, on_save):
     win = tk.Toplevel(parent)
-    win.title("Brand Style Studio / Конструктор стилей")
+    win.title("Настройка стиля")
     win.transient(parent)
     win.geometry("720x620")
     win.minsize(620, 530)
@@ -36,8 +36,8 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
     vars = {}
     notebook = ttk.Notebook(win)
     notebook.grid(sticky="nsew", padx=14, pady=12)
-    tabs = [ttk.Frame(notebook, padding=14) for _ in range(3)]
-    for tab, title in zip(tabs, ("Бренд и шрифты", "Цвета", "Страница")):
+    tabs = [ttk.Frame(notebook, padding=14) for _ in range(4)]
+    for tab, title in zip(tabs, ("Шрифты", "Цвета", "Страница", "Логотип и бренд")):
         notebook.add(tab, text=title)
         tab.columnconfigure(1, weight=1)
     page_numbers = tk.BooleanVar()
@@ -51,8 +51,9 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
         if key in ("font","mono"):
             ttk.Combobox(tab,textvariable=var,values=fonts).grid(row=i,column=1,sticky="ew",pady=5)
         elif key in NUMBERS:
+            lo,hi = {"body_pt":(7,24),"line_height":(1,2.5),"logo_mm":(5,35),"margin_bottom":(8,40)}.get(key,(5,40))
             step = .1 if key == "line_height" else .5
-            ttk.Spinbox(tab,textvariable=var,from_=1,to=40,increment=step).grid(row=i,column=1,sticky="ew",pady=5)
+            ttk.Spinbox(tab,textvariable=var,from_=lo,to=hi,increment=step).grid(row=i,column=1,sticky="ew",pady=5)
         else:
             ttk.Entry(tab,textvariable=var).grid(row=i,column=1,sticky="ew",pady=5)
         if color:
@@ -70,31 +71,34 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
             var.trace_add("write",update_color)
             swatch.bind("<Button-1>",lambda e:choose())
             ttk.Button(tab,text="Выбрать…",command=choose).grid(row=i,column=3,padx=6)
-    for i,key in enumerate(("name","product","font","mono","footer")):
+    for i,key in enumerate(("font","mono","body_pt","line_height")):
         row(tabs[0],i,key)
-    ttk.Label(tabs[0],text="Базовый макет").grid(row=5,column=0,sticky="w")
-    ttk.Combobox(tabs[0],textvariable=base,values=("technical","business","academic","granulex"),state="readonly").grid(row=5,column=1,sticky="ew")
+    for i,key in enumerate(("name","product")):
+        row(tabs[3],i,key)
+    ttk.Label(tabs[3],text="Базовый макет").grid(row=2,column=0,sticky="w")
+    ttk.Combobox(tabs[3],textvariable=base,values=("technical","business","academic","granulex"),state="readonly").grid(row=2,column=1,sticky="ew")
     def upload():
         nonlocal current
-        path = filedialog.askopenfilename(parent=win,filetypes=[("Logo","*.svg *.png *.jpg *.jpeg")])
+        path = filedialog.askopenfilename(parent=win,filetypes=[("Логотип","*.svg *.png *.jpg *.jpeg")])
         if path:
             try:
                 kind,data = import_logo(Path(path))
                 current = replace(current,logo_kind=kind,logo_data=data)
-                logo_status.set("SVG (vector)" if kind=="svg" else "PNG inside SVG (raster)")
+                logo_status.set("SVG · вектор" if kind=="svg" else "PNG в SVG · растр")
             except Exception as exc:
-                messagebox.showerror("Logo",str(exc),parent=win)
+                messagebox.showerror("Логотип",str(exc),parent=win)
     def remove_logo():
         nonlocal current
         current = replace(current,logo_kind="",logo_data="")
         logo_status.set("Нет логотипа")
-    ttk.Label(tabs[0],textvariable=logo_status).grid(row=6,column=0,columnspan=2,sticky="w",pady=12)
-    ttk.Button(tabs[0],text="Загрузить логотип…",command=upload).grid(row=7,column=0,sticky="w")
-    ttk.Button(tabs[0],text="Убрать логотип",command=remove_logo).grid(row=7,column=1,sticky="w")
+    ttk.Label(tabs[3],textvariable=logo_status).grid(row=6,column=0,columnspan=2,sticky="w",pady=12)
+    ttk.Button(tabs[3],text="Загрузить логотип…",command=upload).grid(row=7,column=0,sticky="w")
+    ttk.Button(tabs[3],text="Убрать логотип",command=remove_logo).grid(row=7,column=1,sticky="w")
     for i,key in enumerate(COLORS):
         row(tabs[1],i,key,True)
-    for i,key in enumerate(NUMBERS):
+    for i,key in enumerate(("margin_top","margin_right","margin_bottom","margin_left","footer")):
         row(tabs[2],i,key)
+    row(tabs[3],4,"logo_mm")
     ttk.Checkbutton(tabs[2],text="Номера страниц",variable=page_numbers).grid(row=8,column=0,columnspan=2,sticky="w",pady=8)
 
     def populate(profile):
@@ -126,7 +130,7 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
         try:
             action()
         except Exception as exc:
-            messagebox.showerror("Brand Style Studio",str(exc),parent=win)
+            messagebox.showerror("Настройка стиля",str(exc),parent=win)
     def save():
         p = value()
         target = existing or library_dir() / (uuid.uuid4().hex+".json")

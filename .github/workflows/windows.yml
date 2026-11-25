@@ -2,7 +2,7 @@ name: Desktop builds and release
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'develop/v0.3.0']
+    branches: [main, 'develop/v0.3.0', 'develop/v0.4.0']
     paths: ['src/**', 'tests/**', 'packaging/**', 'scripts/**', 'examples/**', 'pyproject.toml', '.github/workflows/windows.yml', '.github/workflows/macos.yml']
 permissions:
   contents: read

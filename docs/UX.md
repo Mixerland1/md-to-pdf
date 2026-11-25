@@ -7,3 +7,5 @@ Main screen hides technical CSS, output paths, overwrite toggles and per-documen
 One Настроить стили entry opens the style library. Select a built-in or saved style, configure fonts using installed-font dropdowns (including packaged families), colors via visible swatches, page settings and real PDF preview. Built-ins are not overwritten: edits save a named copy. Create/import actions live inside the library, not the conversion screen. JSON export remains inside the profile editor.
 
 Native text editor prototype has a style toolbar, mouse selection, undo/redo and direct PDF export beside source. It is not a real page-layout view yet. Manual visual and keyboard testing on Windows and Mac remains required.
+
+Preview build: branch develop/v0.4.0 triggers Windows and both macOS artifacts, without publishing a stable release. Font and page controls use bounded spinboxes; the style editor has separate Fonts, Colors, Page and Logo/Brand tabs. Source GUI smoke tests run under Xvfb in Linux CI. This is not manual desktop acceptance.

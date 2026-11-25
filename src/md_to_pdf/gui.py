@@ -7,8 +7,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from .batch import collect_sources, plan_outputs
-from .cli import convert, TEMPLATES
-from .profiles import Profile, granulex_profile, load_profile, list_profiles
+from .cli import convert
+from .profiles import load_profile, list_profiles
 from .profile_editor import manage_profiles
 
 
@@ -61,7 +61,7 @@ def main():
         if not busy:
             sources.clear()
             queuebox.delete(0, "end")
-            status.set("Ready / Готово")
+            status.set("Готово")
     drop = ttk.Label(panel, text=("Перетащите файлы или папки сюда"
                                 if drag else "Добавьте файлы кнопкой ниже"),
                      anchor="center", padding=18, relief="groove")

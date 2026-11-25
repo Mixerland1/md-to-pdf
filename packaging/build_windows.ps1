@@ -11,7 +11,7 @@ $env:PATH = "$env:WEASYPRINT_DLL_DIRECTORIES;$env:PATH"
 & $Python -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 & ./packaging/check_update.ps1
-& $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name 'MD-to-PDF' --collect-all md_to_pdf --collect-all weasyprint --collect-all tkinterdnd2 --collect-all mistune --collect-all mammoth --collect-all bleach --add-binary "$env:WEASYPRINT_DLL_DIRECTORIES\*.dll;native" packaging/desktop.py
+& $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name 'MD-to-PDF' --collect-all md_to_pdf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all weasyprint --collect-all tkinterdnd2 --collect-all mistune --collect-all mammoth --collect-all bleach --add-binary "$env:WEASYPRINT_DLL_DIRECTORIES\*.dll;native" packaging/desktop.py
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 $root = 'dist/MD-to-PDF'
 Copy-Item LICENSE,README.md $root

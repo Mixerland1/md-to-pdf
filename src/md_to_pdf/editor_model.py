@@ -118,6 +118,21 @@ class DocumentEditor:
     def html(self):
         return html.tostring(self._doc, encoding="unicode", method="html", doctype="<!doctype html>")
 
+    def preview_html(self):
+        """Return HTML with unique layout anchors and a parallel block ID list."""
+        ids = {n.get("id") for n in self._doc.xpath("//*[@id]")}
+        anchors = []
+        for i,node in enumerate(self._nodes()):
+            value = node.get("id")
+            if not value or len(self._doc.xpath("//*[@id=$value]",value=value)) != 1:
+                value = "mdtopdf-preview-" + str(i)
+                while value in ids:
+                    value += "-x"
+                node.set("id",value)
+                ids.add(value)
+            anchors.append(value)
+        return self.html(), anchors
+
     def _header_nodes(self):
         headers = self._main.xpath('./div[contains(concat(" ",normalize-space(@class)," ")," doc-header ")]')
         if not headers:

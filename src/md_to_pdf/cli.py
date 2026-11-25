@@ -114,6 +114,20 @@ def write_rendered_pdf(html: str, source: Path, output: Path, *, css: Path | Non
     if source == output:
         raise ValueError("Input and output must be different files")
     output.parent.mkdir(parents=True, exist_ok=True)
+    document = layout_pdf(html, source, css=css)
+    # Replace an existing PDF only after successful rendering.
+    with tempfile.NamedTemporaryFile(dir=output.parent,suffix=".pdf",delete=False) as stream:
+        temporary = Path(stream.name)
+    try:
+        document.write_pdf(temporary)
+        temporary.replace(output)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def layout_pdf(html: str, source: Path, *, css: Path | None = None):
+    """Use the same restricted resource fetcher for preview and final export."""
+    source = source.resolve()
     from weasyprint import HTML
     from weasyprint.urls import URLFetcher
     from urllib.request import url2pathname
@@ -134,14 +148,7 @@ def write_rendered_pdf(html: str, source: Path, output: Path, *, css: Path | Non
                     return default.fetch(url, *args, **kwargs)
             raise ValueError(f"Blocked resource outside local document folders: {url}")
 
-    # Replace an existing PDF only after successful rendering.
-    with tempfile.NamedTemporaryFile(dir=output.parent,suffix=".pdf",delete=False) as stream:
-        temporary = Path(stream.name)
-    try:
-        HTML(string=html, base_url=source.parent.as_uri() + "/", url_fetcher=LocalFetcher()).write_pdf(temporary)
-        temporary.replace(output)
-    finally:
-        temporary.unlink(missing_ok=True)
+    return HTML(string=html, base_url=source.parent.as_uri() + "/", url_fetcher=LocalFetcher()).render()
 
 
 def main(argv: list[str] | None = None) -> int:

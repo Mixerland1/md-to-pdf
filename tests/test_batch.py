@@ -8,7 +8,7 @@ from pypdf import PdfReader
 class BatchTests(unittest.TestCase):
     def test_discovery(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            root = Path(tmp).resolve()
             a = root / "a.md"; a.write_text("# A")
             sub = root / "sub"; sub.mkdir()
             b = sub / "b.MARKDOWN"; b.write_text("# B")
@@ -16,7 +16,7 @@ class BatchTests(unittest.TestCase):
             self.assertEqual(set(collect_sources([root], recursive=True)), {a, b})
     def test_collision_and_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp); sub = root / "sub"; sub.mkdir()
+            root = Path(tmp).resolve(); sub = root / "sub"; sub.mkdir()
             a, b = root / "a.md", sub / "a.md"
             a.touch(); b.touch()
             with self.assertRaises(ValueError):
@@ -27,7 +27,7 @@ class BatchTests(unittest.TestCase):
             self.assertEqual(plan_outputs([a], overwrite=True)[0][1], a.with_suffix(".pdf"))
     def test_templates_and_batch_cli(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp); a = root / "a.md"; b = root / "b.md"
+            root = Path(tmp).resolve(); a = root / "a.md"; b = root / "b.md"
             a.write_text("# Alpha"); b.write_text("# Beta")
             self.assertEqual(len({render_html(a, template=t) for t in TEMPLATES}), 3)
             self.assertEqual(main([str(root), "--template", "business"]), 0)

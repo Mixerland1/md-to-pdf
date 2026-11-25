@@ -53,7 +53,7 @@ jobs:
           path: MD-to-PDF-macOS-${{ matrix.arch }}.zip
           if-no-files-found: error
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop/v0.4.0'
     needs: [windows, macos]
     runs-on: ubuntu-latest
     permissions:
@@ -75,6 +75,11 @@ jobs:
           set -euo pipefail
           version=$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml)
           tag="v$version"
+          flags=()
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+b[0-9]+$ ]] || exit 0
+            flags+=(--prerelease --latest=false)
+          fi
           cd release-assets
           for file in MD-to-PDF-Windows-x64.zip MD-to-PDF-macOS-arm64.zip MD-to-PDF-macOS-x86_64.zip; do
             test -s "$file"
@@ -83,5 +88,5 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release already exists; bump version for new binaries."
           else
-            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file "../docs/RELEASE_$version.md"
+            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file "../docs/RELEASE_$version.md" "${flags[@]}"
           fi

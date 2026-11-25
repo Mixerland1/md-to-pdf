@@ -1,0 +1,5 @@
+# MD to PDF 0.4.0 beta 1
+
+Preview for manual acceptance. New simplified Russian UI, direct PDF replacement beside the source, style library with font/color/page/brand controls and selection-based text styling. Automatic Markdown header extraction. The document editor is a text view, not true paginated WYSIWYG. Project saving is not yet implemented.
+
+Single ZIP for each desktop architecture. Windows portable x64 includes an explicit updater: checks public release metadata at launch and offers a verified download and restart. Only the EXE and its managed runtime are replaced; previous binaries are retained for rollback. Mac offers a direct download of the matching release asset, not automatic installation. Source documents and the profile library are not uploaded. SHA-256 protects against corrupted downloads but does not independently authenticate an unsigned publisher. Windows unsigned; macOS ad-hoc signed and not notarized. No claim of manual update acceptance until tested from beta 1 to a later release.

@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import queue
+import sys
+import webbrowser
 import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+from . import __version__
 from .batch import collect_sources, plan_outputs
 from .cli import convert
 from .profiles import load_profile, list_profiles
@@ -20,7 +23,7 @@ def main():
     except (ImportError, tk.TclError):
         root = tk.Tk()
         drag = False
-    root.title("MD to PDF • 0.4.0 dev")
+    root.title("MD to PDF • " + __version__)
     root.geometry("740x510")
     root.minsize(660, 440)
     root.columnconfigure(0, weight=1)
@@ -29,7 +32,9 @@ def main():
     panel.grid(sticky="nsew")
     panel.columnconfigure(0, weight=1)
     panel.rowconfigure(3, weight=1)
-    ttk.Label(panel, text="MD to PDF", font=("TkDefaultFont", 24, "bold")).grid(sticky="w")
+    header = ttk.Frame(panel)
+    header.grid(sticky="ew")
+    ttk.Label(header, text="MD to PDF", font=("TkDefaultFont", 24, "bold")).pack(side="left")
     ttk.Label(panel, text="MD · TXT · DOCX → PDF").grid(sticky="w", pady=(0, 12))
     queuebox = tk.Listbox(panel, selectmode="extended", exportselection=False, height=8, font=("TkDefaultFont", 10))
     queuebox.grid(row=3, column=0, sticky="nsew", pady=8)
@@ -39,6 +44,9 @@ def main():
     template = tk.StringVar(value="Технический")
     status = tk.StringVar(value="Готово")
     controls = []
+    available_update = None
+    checking = False
+    update_button = None
     def add(paths):
         if busy or not paths:
             return
@@ -156,11 +164,74 @@ def main():
                 events.put(("progress", i, len(jobs)))
             events.put(("done", errors, len(jobs)))
         threading.Thread(target=worker, daemon=True).start()
+    def check_update(manual=False):
+        nonlocal checking
+        if checking or busy:
+            return
+        checking = True
+        def worker():
+            try:
+                from .updater import check
+                events.put(("update-check", check(), manual))
+            except Exception as exc:
+                events.put(("update-error", str(exc), manual))
+        threading.Thread(target=worker,daemon=True).start()
+
+    def update_action():
+        if busy:
+            return
+        if available_update is None:
+            check_update(True)
+            return
+        from .updater import WINDOWS
+        if available_update.asset != WINDOWS:
+            # macOS replacement is not yet enabled; direct release download.
+            webbrowser.open(available_update.url)
+            return
+        if not messagebox.askyesno("Обновление", "Скачать новую версию и перезапустить программу?\nИсходные документы и сохранённые стили не изменятся.",parent=root):
+            return
+        set_busy(True)
+        status.set("Загрузка и проверка обновления…")
+        def worker():
+            try:
+                from .updater import prepare_windows
+                prepare_windows(available_update)
+                events.put(("update-exit",None,0))
+            except Exception as exc:
+                events.put(("update-failed",str(exc),0))
+        threading.Thread(target=worker,daemon=True).start()
+
+    if getattr(sys,"frozen",False):
+        from .updater import platform_asset
+        if platform_asset():
+            update_button = button(header,"Проверить обновления",update_action)
+            update_button.pack(side="right")
+            root.after(400,check_update)
+
     def poll():
+        nonlocal checking, available_update
         try:
             while True:
                 kind, value, total = events.get_nowait()
-                if kind == "progress":
+                if kind == "update-check":
+                    checking = False
+                    available_update = value
+                    if value and update_button:
+                        update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
+                    elif total:
+                        messagebox.showinfo("Обновление","Установлена актуальная версия.",parent=root)
+                elif kind == "update-error":
+                    checking = False
+                    if total:
+                        messagebox.showwarning("Обновление","Не удалось проверить обновления: "+value,parent=root)
+                elif kind == "update-failed":
+                    set_busy(False)
+                    status.set("Обновление не выполнено")
+                    messagebox.showerror("Обновление",value,parent=root)
+                elif kind == "update-exit":
+                    root.destroy()
+                    return
+                elif kind == "progress":
                     progress.configure(value=value)
                     status.set(f"{value}/{total} обработано")
                 else:

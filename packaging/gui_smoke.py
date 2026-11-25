@@ -1,5 +1,6 @@
 """Single-window GUI acceptance smoke on virtual display."""
 import tempfile,time
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 import tkinter as tk
@@ -32,6 +33,26 @@ try:
                 time.sleep(.05)
             assert preview.doc is not None,"Actual PDF preview did not render"
             assert len(preview.mapping)>0,"PDF selection mapping empty"
+            controls=[w for w in descendants(root) if isinstance(w,ttk.Combobox)]
+            role=next(w for w in controls if "Заголовок 2" in w.cget("values"))
+            idx=next(i for i,(block,offset) in preview.mapping.items() if block==1)
+            l,t,r,b=preview._rect(idx)
+            event=SimpleNamespace(x=(l+r)/2-preview.canvas.canvasx(0),y=(t+b)/2-preview.canvas.canvasy(0))
+            preview._press(event)
+            preview._release(event)
+            assert role.get()=="Текст",role.get()
+            assert len(preview.selected)>1 and len(preview.handles)==2
+            role.set("Заголовок 2")
+            role.event_generate("<<ComboboxSelected>>")
+            root.update()
+            deadline=time.monotonic()+30
+            while (str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" or not preview.selected) and time.monotonic()<deadline:
+                root.update()
+                time.sleep(.05)
+            assert role.get()=="Заголовок 2",role.get()
+            assert preview.selected,"Selection lost after reflow"
+            buttons(root)["Сохранить"].invoke()
+            assert source.with_name(source.name+".mdtopdf").is_file()
             assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
             buttons(root)["Экспорт PDF"].invoke()
             assert source.with_suffix(".pdf").is_file()

@@ -30,7 +30,7 @@ def main():
         drag=False
     root.title("MD to PDF • "+__version__)
     root.geometry("1200x820")
-    root.minsize(800,480)
+    root.minsize(1020,480)
     root.columnconfigure(0,weight=1)
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
@@ -46,8 +46,8 @@ def main():
     def options():
         key=preset.get()
         p=load_profile(profiles[key]) if key in profiles else None
-        if key not in BUILTINS and p is None and state["workspace"]:
-            return state["workspace"].options
+        if key not in BUILTINS and p is None:
+            return state["workspace"].options if state["workspace"] else dict(template="technical",profile=None)
         return dict(template=p.base if p else BUILTINS[key],profile=p)
     def discard_ok():
         return not state["dirty"] or messagebox.askyesno("MD to PDF","Открыть другой документ без сохранения изменений?",parent=root)
@@ -121,6 +121,8 @@ def main():
             messagebox.showerror("Открытие документа",str(exc),parent=root)
             return
         state.update(workspace=ws,dirty=False,result=None,selection=[],brush=None,restore_selection=[])
+        brush_button.configure(text="Кисть")
+        update_fields()
         empty.grid_remove()
         editor_bar.pack(side="left")
         export_button.pack(side="right")
@@ -161,6 +163,8 @@ def main():
         state["restore_selection"]=list(state["selection"]) if preserve else []
         state["selection"]=[]
         state["rendering"]=True
+        if not preserve:
+            update_fields()
         export_button.configure(state="disabled")
         for control in (styles,font_box,size_box,brush_button):
             control.configure(state="disabled")
@@ -188,11 +192,13 @@ def main():
         if not style or not state["workspace"] or state["rendering"]:
             return
         if not state["selection"]:
+            update_fields()
             message("Выделите текст на странице.")
             return
         apply_values(style)
     def apply_values(style):
         if state["rendering"] or state["updating"] or not state["selection"]:
+            update_fields()
             return
         try:
             state["workspace"].apply(style,state["selection"])
@@ -310,7 +316,7 @@ def main():
         if sys.platform!="win32":
             webbrowser.open(release.url)
             return
-        if not messagebox.askyesno("Обновление","Обновить программу и перезапустить?"+("\nНеэкспортированные изменения будут потеряны." if state["dirty"] else ""),parent=root):
+        if not messagebox.askyesno("Обновление","Обновить программу и перезапустить?"+("\nНесохранённые изменения будут потеряны." if state["dirty"] else ""),parent=root):
             return
         state["updating"]=True
         message("Загрузка обновления…")
@@ -364,7 +370,7 @@ def main():
     def close():
         if state["updating"]:
             return
-        if state["dirty"] and not messagebox.askyesno("MD to PDF","Закрыть без экспорта изменений?",parent=root):
+        if state["dirty"] and not messagebox.askyesno("MD to PDF","Закрыть без сохранения изменений?",parent=root):
             return
         preview.close()
         root.destroy()

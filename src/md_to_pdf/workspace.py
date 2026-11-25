@@ -45,10 +45,12 @@ class Workspace:
             if len(ranges) != len(selections):
                 skipped += 1
                 continue
+            previous=model.html()
             try:
                 for item in (style if isinstance(style,list) else [style]):
                     model.apply(item,ranges)
-            except ValueError:
+            except (ValueError,TypeError):
+                model._load(previous)
                 skipped += 1
         self.model = model
         self.options = options

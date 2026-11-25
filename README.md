@@ -101,6 +101,10 @@ See [feature comparison, methodology and benchmark instructions](benchmark/READM
 
 See [product roadmap](docs/ROADMAP.md) for planned TXT/DOCX input, corporate profiles (Granulex first), and a visual style constructor. These features are under development for 0.3.0; the stable release remains 0.2.0.
 
+## Development branch — Brand Style Studio 0.3.0
+
+The next version supports Markdown, TXT and semantic DOCX import, Granulex branding and a local profile editor with logo import, colors, fonts, page margins, footer and PDF preview. These features are not yet in the stable 0.2.0 Windows release. See [document import](docs/IMPORTS.md) and [brand profile instructions / Конструктор стилей](docs/PROFILES.md).
+
 ## Development
 
 ```sh

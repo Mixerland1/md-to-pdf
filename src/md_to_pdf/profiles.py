@@ -140,7 +140,7 @@ blockquote {{ border-left-color:{self.accent}; }}
 .brand-accent {{ color:{self.accent}; }}
 .doc-header {{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 16px; break-inside:avoid; break-after:avoid-page; }}
 .header-left {{ display:flex; align-items:center; flex:1; color:{self.heading}; font-weight:700; }}
-.brand-logo {{ width:auto; height:auto; max-width:{self.logo_mm*2.5}mm; max-height:{self.logo_mm}mm; margin-right:12px; }}
+.header-left .brand-logo {{ width:auto; height:{self.logo_mm}mm; max-width:{self.logo_mm*2.5}mm; max-height:{self.logo_mm}mm; object-fit:contain; flex:none; margin-right:12px; }}
 .header-right {{ display:flex; flex-direction:column; align-items:flex-end; text-align:right; color:{self.muted}; font-size:8pt; }}
 .header-right span:empty {{ display:none; }}
 .header-right-title {{ font-weight:700; }}
@@ -198,7 +198,7 @@ def list_profiles():
     for path in sorted(library_dir().glob("*.json")):
         try:
             profile = load_profile(path)
-        except (OSError, ValueError, TypeError):
+        except (OSError, ValueError, TypeError, SyntaxError):
             continue
         result[f"{profile.name} [{path.stem[:8]}]"] = path
     return result

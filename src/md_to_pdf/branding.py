@@ -35,7 +35,10 @@ def safe_svg(svg: str) -> str:
     # Narrow support for self-contained path-only vector marks.
     if len(svg) > 100_000 or "<!" in svg or "<?" in svg:
         raise ValueError("Unsupported SVG declarations or size")
-    root = ET.fromstring(svg)
+    try:
+        root = ET.fromstring(svg)
+    except ET.ParseError as exc:
+        raise ValueError("Invalid SVG") from exc
     if root.tag != f"{{{NS}}}svg":
         raise ValueError("Expected SVG root")
     for el in root.iter():
@@ -67,15 +70,17 @@ def extract_header(text: str) -> tuple[str, Header]:
 
 
 def render_header(header: Header, *, name: str | None = None,
-                  version: str | None = None, updated: str | None = None) -> str:
-    svg = header.svg or safe_svg(Path(__file__).with_name("templates").joinpath("granulex-logo.svg").read_text(encoding="utf-8"))
-    uri = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode("ascii")
+                  version: str | None = None, updated: str | None = None, logo_uri: str | None = None) -> str:
+    if logo_uri is None:
+        svg = header.svg or safe_svg(Path(__file__).with_name("templates").joinpath("granulex-logo.svg").read_text(encoding="utf-8"))
+        logo_uri = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode("ascii")
+    logo = f'<img class="brand-logo" src="{escape(logo_uri, quote=True)}" alt=""/>' if logo_uri else ""
     n = header.name if name is None else name
     v = header.version if version is None else ("Версия " + version if version else "")
     u = header.updated if updated is None else ("Последнее обновление: " + updated if updated else "")
     return (
         '<div class="doc-header"><div class="header-left">'
-        f'<img class="brand-logo" src="{uri}" alt=""/><span>{escape(n)}</span></div>'
+        f'{logo}<span>{escape(n)}</span></div>'
         '<div class="header-right">'
         f'<span class="header-right-title">{escape(v)}</span>'
         f'<span class="header-right-update">{escape(u)}</span>'

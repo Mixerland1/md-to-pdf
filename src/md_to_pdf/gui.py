@@ -9,6 +9,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from .batch import collect_sources, plan_outputs
 from .cli import convert, TEMPLATES
+from .profiles import Profile, granulex_profile, load_profile, list_profiles
+from .profile_editor import edit_profile
 
 
 def main():
@@ -93,8 +95,38 @@ def main():
     settings.grid(row=5, sticky="ew")
     settings.columnconfigure(1, weight=1)
     ttk.Label(settings, text="Template / Шаблон").grid(row=0, column=0, sticky="w", padx=(0, 12))
-    combo = ttk.Combobox(settings, textvariable=template, values=TEMPLATES, state="readonly")
+    profiles = list_profiles()
+    combo = ttk.Combobox(settings, textvariable=template, values=(*TEMPLATES, *profiles), state="readonly")
     combo.grid(row=0, column=1, sticky="ew", pady=3); controls.append(combo)
+    def refreshed(path):
+        nonlocal profiles
+        profiles = list_profiles()
+        combo.configure(values=(*TEMPLATES, *profiles))
+        for label, item in profiles.items():
+            if item == path:
+                template.set(label)
+                break
+    def edit_current(copy=False):
+        label = template.get()
+        try:
+            path = profiles.get(label)
+            initial = load_profile(path) if path else granulex_profile() if label == "granulex" else Profile(base=label)
+            edit_profile(root, initial=initial, existing=None if copy else path, on_save=refreshed)
+        except Exception as exc:
+            messagebox.showerror("Brand Style Studio", str(exc), parent=root)
+    def import_profile():
+        path = filedialog.askopenfilename(parent=root, filetypes=[("Brand profile","*.json")])
+        if path:
+            try:
+                edit_profile(root, initial=load_profile(Path(path)), on_save=refreshed)
+            except Exception as exc:
+                messagebox.showerror("Brand Style Studio",str(exc),parent=root)
+    profile_buttons = ttk.Frame(settings)
+    profile_buttons.grid(row=5,column=0,columnspan=3,sticky="w",pady=6)
+    button(profile_buttons,"Edit / Стиль",edit_current).pack(side="left")
+    button(profile_buttons,"Copy / Копировать",lambda:edit_current(True)).pack(side="left",padx=5)
+    button(profile_buttons,"Import / Импорт",import_profile).pack(side="left")
+    button(profile_buttons,"New / Новый",lambda:edit_profile(root,on_save=refreshed)).pack(side="left",padx=5)
     def pathrow(row, label, variable, browse):
         ttk.Label(settings, text=label).grid(row=row, column=0, sticky="w")
         entry = ttk.Entry(settings, textvariable=variable)
@@ -121,7 +153,7 @@ def main():
         entry.grid(row=i, column=1, sticky="ew", pady=2)
         controls.append(entry)
     def show_brand(*_):
-        if template.get() == "granulex":
+        if template.get() == "granulex" or template.get() in profiles:
             brand_fields.grid()
         else:
             brand_fields.grid_remove()
@@ -146,6 +178,9 @@ def main():
             if custom and not custom.is_file():
                 raise ValueError("CSS file not found")
             preset = template.get()
+            profile = load_profile(profiles[preset]) if preset in profiles else None
+            if profile is not None:
+                preset = profile.base
             meta = dict(brand_name=brand_name.get().strip() or None,
                         brand_version=brand_version.get().strip() or None,
                         brand_updated=brand_updated.get().strip() or None)
@@ -159,7 +194,7 @@ def main():
             errors = []
             for i, (source, target) in enumerate(jobs, 1):
                 try:
-                    convert(source, target, css=custom, template=preset, **meta)
+                    convert(source, target, css=custom, template=preset, profile=profile, **meta)
                 except Exception as exc:
                     errors.append(f"{source.name}: {exc}")
                 events.put(("progress", i, len(jobs)))

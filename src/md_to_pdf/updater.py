@@ -180,6 +180,20 @@ def unpack_windows(archive, destination):
         raise ValueError("Неполный дистрибутив")
 
 
+def restart_environment():
+    """Do not let PyInstaller pass the old bundle's state to its replacement."""
+    env={key:value for key,value in os.environ.items()
+         if not key.upper().startswith("_PYI_") and key.upper() not in
+         ("_MEIPASS2","WEASYPRINT_DLL_DIRECTORIES","PYINSTALLER_RESET_ENVIRONMENT")}
+    env["PYINSTALLER_RESET_ENVIRONMENT"]="1"
+    bundle=getattr(sys,"_MEIPASS",None)
+    if bundle:
+        root=Path(bundle).resolve()
+        env["PATH"]=os.pathsep.join(p for p in env.get("PATH","").split(os.pathsep)
+                                  if p and not Path(p).resolve().is_relative_to(root))
+    return env
+
+
 def prepare_windows(release):
     if release.asset not in (WINDOWS,WINDOWS_SETUP) or not getattr(sys, "frozen", False) or sys.platform != "win32":
         raise ValueError("Автоматическая замена поддерживается только в Windows-сборке")
@@ -208,7 +222,8 @@ def prepare_windows(release):
         powershell = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32/WindowsPowerShell/v1.0/powershell.exe"
         subprocess.Popen([str(powershell), "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
                           "-File", str(helper), "-InstallDir", str(install), "-Stage", str(stage),
-                          "-AppPid", str(os.getpid())], cwd=stage, creationflags=subprocess.CREATE_NO_WINDOW)
+                          "-AppPid", str(os.getpid()), "-ExpectedVersion",release.version], cwd=stage,
+                         env=restart_environment(), creationflags=subprocess.CREATE_NO_WINDOW)
     except Exception:
         shutil.rmtree(stage, ignore_errors=True)
         raise

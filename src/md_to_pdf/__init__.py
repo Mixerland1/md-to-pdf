@@ -1,2 +1,2 @@
 """Standalone Markdown-to-PDF conversion."""
-__version__ = "0.4.0b14"
+__version__ = "0.4.0b15"

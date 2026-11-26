@@ -39,6 +39,10 @@ $p = Start-Process -FilePath "$root/MD-to-PDF.exe" -ArgumentList "--brand-smoke-
 if ($p.ExitCode -ne 0 -or !(Test-Path $brand)) { throw 'Frozen brand smoke test failed' }
 & $Python packaging/check_smoke.py $out $brand
 if ($LASTEXITCODE -ne 0) { throw 'Frozen brand PDF validation failed' }
+$expectedVersion = (& $Python -c "from md_to_pdf import __version__; print(__version__)").Trim()
+$versionFile = Join-Path $PWD 'windows-version.txt'
+$p = Start-Process -FilePath "$root/MD-to-PDF.exe" -ArgumentList ('--version-file "' + $versionFile + '"') -Wait -PassThru
+if ($p.ExitCode -ne 0 -or !(Test-Path $versionFile) -or (Get-Content $versionFile -Raw).Trim() -ne $expectedVersion) { throw 'Frozen version mismatch' }
 Compress-Archive -Path $root -DestinationPath 'MD-to-PDF-Windows-x64.zip' -Force
 
 # Build the installer and check install/uninstall on the disposable runner.

@@ -1,0 +1,3 @@
+# 0.4.0 beta 15 — update reliability
+
+Portable updater clears inherited PyInstaller bundle state, retries locked moves and waits for the restarted GUI to confirm the expected version. Logs are also written to %LOCALAPPDATA%\MD-to-PDF\update.log. Rollback is visible rather than silent. Frozen build verifies embedded version. GUI test pumps layout after opening pasted document. Installer remains available for Program Files installations. Existing Beta 13/14 portable copies contain the previous updater; installing Setup.exe once is the recommended recovery. Exact cause of reported local rollback is not confirmed without its log. Manual Windows end-to-end upgrade remains pending.

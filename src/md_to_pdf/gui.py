@@ -77,7 +77,7 @@ def confirm_changes(parent, dirty, save_callback):
     return answer=="discard"
 
 
-def main():
+def main(ready_file=None):
     try:
         from tkinterdnd2 import TkinterDnD,DND_FILES
         root=TkinterDnD.Tk()
@@ -838,6 +838,7 @@ def main():
                     return
                 elif kind=="update-error":
                     state["updating"]=False
+                    messagebox.showerror("Обновление",value,parent=root)
                     message(value)
         except queue.Empty:
             pass
@@ -865,6 +866,16 @@ def main():
     root.bind("<Control-z>",lambda e:None if state["importing"] or state["configuring"] or state["home"] else history(False))
     root.bind("<Control-y>",lambda e:None if state["importing"] or state["configuring"] or state["home"] else history(True))
     root.after(80,poll)
+    if ready_file is not None:
+        def signal_ready():
+            if root.winfo_ismapped() and empty.winfo_ismapped():
+                path=Path(ready_file)
+                tmp=path.with_suffix('.tmp')
+                tmp.write_text(__version__,encoding='ascii')
+                tmp.replace(path)
+            else:
+                root.after(250,signal_ready)
+        root.after(300,signal_ready)
     try:
         root.mainloop()
     finally:

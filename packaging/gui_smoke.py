@@ -114,6 +114,7 @@ try:
             field.delete("1.0","end")
             field.insert("1.0","# Из буфера\n\nИсправленный текст.")
             buttons(root)["Открыть в редакторе"].invoke()
+            root.update()
             deadline=time.monotonic()+30
             while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
                 root.update()

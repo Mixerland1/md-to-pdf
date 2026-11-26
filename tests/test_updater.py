@@ -47,3 +47,16 @@ class UpdaterTests(unittest.TestCase):
         r["assets"].append(dict(name=WINDOWS_SETUP,state="uploaded",size=123,
                                 browser_download_url=DOWNLOAD+r["tag_name"]+"/"+WINDOWS_SETUP))
         self.assertEqual(select_release([r],"0.4.0b13",WINDOWS_SETUP).asset,WINDOWS_SETUP)
+
+    def test_restart_environment_discards_stale_bundle_state(self):
+        from unittest.mock import patch
+        from md_to_pdf.updater import restart_environment
+        import os,sys
+        with tempfile.TemporaryDirectory() as folder:
+            bundle=Path(folder)/"_internal"
+            with patch.object(sys,"_MEIPASS",str(bundle),create=True), patch.dict(os.environ,{"_PYI_APPLICATION_HOME_DIR":"old","WEASYPRINT_DLL_DIRECTORIES":"old","PATH":str(bundle/"native")+os.pathsep+str(Path(folder)/"bin")},clear=True):
+                env=restart_environment()
+            self.assertNotIn("_PYI_APPLICATION_HOME_DIR",env)
+            self.assertNotIn("WEASYPRINT_DLL_DIRECTORIES",env)
+            self.assertEqual(env["PYINSTALLER_RESET_ENVIRONMENT"],"1")
+            self.assertEqual(env["PATH"],str(Path(folder)/"bin"))

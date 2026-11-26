@@ -11,3 +11,5 @@ Acceptance: successful frozen package tests, isolated Windows helper swap test, 
 Beta publication policy: a verified Windows archive may be published even if macOS builds fail. Only verified artifacts are included and missing platforms are identified in release notes; stable releases still require all three platforms. Beta 11 recovery uses the original successful Windows artifact and original source commit, not unverified Mac binaries.
 
 Beta 14: Windows Setup.exe installs under Program Files, creates shortcuts and uninstaller. Installed version selects the SHA-256 verified setup asset and starts the installer wizard with normal UAC; portable ZIP continues to use the existing replacement helper. Portable-to-installed migration requires running setup once.
+
+Beta 15: portable restart requires expected-version acknowledgement from a mapped GUI; stale PyInstaller launch variables are cleared, locked file moves retried, failures reported and logged to %LOCALAPPDATA%\\MD-to-PDF\\update.log. Existing older copies must first obtain the new updater (or use Setup.exe).

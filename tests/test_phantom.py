@@ -46,7 +46,9 @@ class PhantomTests(unittest.TestCase):
             images=Path(d)/"images"
             images.mkdir()
             (images/"logo.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>',encoding="utf-8")
-            self.assertIn((images/"logo.svg").as_uri(),render_html(source,template="phantom"))
+            local=html.document_fromstring(render_html(source,template="phantom"))
+            self.assertEqual(local.xpath('//img[@class="brand-logo"]/@src'),
+                             [(images/"logo.svg").resolve().as_uri()])
             self.assertEqual(phantom_profile().base,"phantom")
 
     def test_icon_transparency(self):

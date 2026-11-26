@@ -33,3 +33,5 @@ Beta 10: single-window large text import view; cancel returns to prior view. Fil
 Beta 11: 18px rounded welcome and import cards, 14px rounded text surface, thin border and subtle shadow. Native rounded window preference on supported Windows; system dialog decoration remains OS controlled.
 
 Beta 12: compact Office-style painter, list toggles and contextual table menu; preset management moved into the preset dropdown and embedded editor. Structural roles are displayed but assigned via their own icons.
+
+Beta 13: built-in Фантом preset, compact legacy cover conversion, local MDIS logo or packaged fallback, guide styles and dynamic linked TOC; approved brush SVG.

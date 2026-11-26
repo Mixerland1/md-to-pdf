@@ -20,7 +20,7 @@ from .workspace import Workspace,render_snapshot,export_bytes,write_pdf_bytes
 from .ui_skin import Backdrop,RoundedPanel,round_window,configure_theme,toolbar_icon,SURFACE,INK
 from .page_preview import PagePreview
 
-BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex"}
+BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex","Фантом":"phantom"}
 STYLES={"Текст":"normal","Заголовок 1":"h1","Заголовок 2":"h2","Заголовок 3":"h3",
         "Заголовок 4":"h4","Заголовок 5":"h5","Заголовок 6":"h6",
         "Цитата":"quote","Примечание":"note","Предупреждение":"warning","Блок кода":"code-block",

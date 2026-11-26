@@ -14,7 +14,7 @@ BORDER = "#bac9df"
 BLUE = "#355d91"
 
 @lru_cache(maxsize=4)
-def vector_image(asset, width, height):
+def vector_image(asset, width, height, transparent=False):
     """Render vector artwork to exact device-pixel dimensions, losslessly."""
     from weasyprint import HTML
     import pypdfium2 as pdfium
@@ -27,9 +27,9 @@ def vector_image(asset, width, height):
     with pdfium.PdfDocument(pdf) as document:
         page=document[0]
         try:
-            bitmap=page.render(scale=4/3)
+            bitmap=page.render(scale=4/3,fill_color=(0,0,0,0) if transparent else (255,255,255,255))
             try:
-                return bitmap.to_pil().convert("RGB").resize((width,height),Image.Resampling.LANCZOS)
+                return bitmap.to_pil().convert("RGBA" if transparent else "RGB").resize((width,height),Image.Resampling.LANCZOS)
             finally:
                 bitmap.close()
         finally:
@@ -211,14 +211,14 @@ def toolbar_icon(master,name,size=22):
         if outline:
             line(points+[points[0]],outline,1)
     if name=="format":
-        # Familiar Word-style diagonal brush: gold bristles, silver ferrule,
-        # dark handle. Draw at 4x resolution for clean small-size edges.
-        poly([(10,11),(18,3),(20,2),(22,4),(21,6),(13,14)],"#596775","#394957")
-        poly([(7,10),(10,7),(16,13),(13,16)],"#e1e5e9","#707c88")
-        poly([(7,10),(13,16),(9,21),(6,20),(3,22),(2,19),(4,15)],"#e7af55","#a87536")
-        line([(6,12),(11,17)],"#f7d98b",1.2)
-        line([(5,15),(3.8,18.5)],"#bd803d",1)
-        line([(8,17),(6.7,19.5)],"#bd803d",1)
+        im=vector_image("format-painter.svg",96,96,True)
+        bbox=im.getbbox()
+        if bbox:
+            im=im.crop(bbox)
+        im=ImageOps.contain(im,(size-1,size-1),Image.Resampling.LANCZOS)
+        canvas=Image.new("RGBA",(size,size),(0,0,0,0))
+        canvas.alpha_composite(im,((size-im.width)//2,(size-im.height)//2))
+        return ImageTk.PhotoImage(canvas,master=master)
     elif name in ("bullet","numbered"):
         for i,y in enumerate((5,12,19),1):
             line([(9,y),(21,y)],INK,1.6)

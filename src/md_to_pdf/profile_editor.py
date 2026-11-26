@@ -7,7 +7,7 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 import tkinter.font as tkfont
-from .profiles import Profile, granulex_profile, import_logo, load_profile, save_profile, library_dir, list_profiles
+from .profiles import Profile, granulex_profile, phantom_profile, import_logo, load_profile, save_profile, library_dir, list_profiles
 from .cli import convert
 from .ui_skin import round_window
 
@@ -86,7 +86,7 @@ def edit_profile(parent, *, initial=None, existing=None, on_save, embedded=False
     for i,key in enumerate(("name","product")):
         row(tabs[3],i,key)
     ttk.Label(tabs[3],text="Базовый макет").grid(row=2,column=0,sticky="w")
-    ttk.Combobox(tabs[3],textvariable=base,values=("technical","business","academic","granulex"),state="readonly").grid(row=2,column=1,sticky="ew")
+    ttk.Combobox(tabs[3],textvariable=base,values=("technical","business","academic","granulex","phantom"),state="readonly").grid(row=2,column=1,sticky="ew")
     def upload():
         nonlocal current
         path = filedialog.askopenfilename(parent=win,filetypes=[("Логотип","*.svg *.png *.jpg *.jpeg")])
@@ -179,6 +179,8 @@ def edit_profile(parent, *, initial=None, existing=None, on_save, embedded=False
 def builtin_profile(key, label):
     if key == "granulex":
         return granulex_profile()
+    if key == "phantom":
+        return phantom_profile()
     settings = {
         "technical": dict(heading="#17344A",accent="#2B7186",table="#E8EFF4",table_text="#17344A",link="#145E88",body_pt=10.5,margin_top=18,margin_right=15,margin_bottom=20,margin_left=15),
         "business": dict(heading="#172B47",accent="#BC9659",table="#172B47",link="#254B83",body_pt=11,line_height=1.5,margin_top=22,margin_right=20,margin_bottom=23,margin_left=20),

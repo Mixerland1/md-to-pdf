@@ -13,7 +13,7 @@ MAX_FILE = 4_000_000
 MAX_LOGO = 2_000_000
 COLOR = re.compile(r"#[0-9a-fA-F]{6}\Z")
 FONT = re.compile(r"[\w .-]{1,60}\Z")
-BASES = ("technical", "business", "academic", "granulex")
+BASES = ("technical", "business", "academic", "granulex", "phantom")
 
 
 def bounded_read(path: Path, limit: int) -> bytes:
@@ -155,6 +155,16 @@ def granulex_profile():
                    margin_top=8.4667, margin_right=14.8167, margin_bottom=19.05,
                    margin_left=14.8167, logo_mm=14.8167,
                    logo_kind="svg", logo_data=safe_svg(logo)).validate()
+
+
+def phantom_profile():
+    logo=Path(__file__).with_name("templates").joinpath("phantom-logo.svg").read_text(encoding="utf-8")
+    return Profile(name="Фантом",base="phantom",product="Фантом",accent="#1F5F99",
+                   text="#222222",heading="#222222",table="#F3F4F6",table_text="#222222",
+                   link="#1F5F99",muted="#555555",font="Manrope",mono="Roboto Mono",
+                   body_pt=10.5,line_height=1.45,margin_top=18,margin_right=18,
+                   margin_bottom=18,margin_left=18,logo_mm=14,
+                   logo_kind="svg",logo_data=safe_svg(logo)).validate()
 
 
 def import_logo(path: Path):

@@ -16,7 +16,7 @@ from .branding import Header, extract_document_header, render_header
 from .profiles import Profile, load_profile
 from .font_assets import bundled_font_css
 
-TEMPLATES = ('technical', 'business', 'academic', 'granulex')
+TEMPLATES = ('technical', 'business', 'academic', 'granulex', 'phantom')
 
 
 class DocumentRenderer(mistune.HTMLRenderer):
@@ -46,7 +46,26 @@ def render_html(source: Path, *, title: str | None = None,
     markdown = mistune.create_markdown(renderer=DocumentRenderer(allow_html=allow_html),
                                       plugins=["table", "strikethrough", "task_lists", "footnotes", "url"])
     brand = ""
-    if profile is not None:
+    if template=="phantom" or (profile is not None and profile.base=="phantom"):
+        from .phantom import extract_phantom,render_phantom_content,default_logo_uri,image_uri
+        template="phantom"
+        if profile is not None:
+            profile.validate()
+        if source.suffix.lower() in MARKDOWN_EXTENSIONS:
+            text,header,lead,local_logo=extract_phantom(source,read_text(source))
+            parser=mistune.create_markdown(renderer=DocumentRenderer(allow_html=True),
+                                      plugins=["table","strikethrough","task_lists","footnotes","url"])
+            content=lead+render_phantom_content(parser(text))
+        else:
+            header=Header(name="Фантом")
+            content=source_html(source,markdown)
+            local_logo=image_uri(source,"images/logo.svg")
+        if profile is not None:
+            logo=profile.logo_uri()
+        else:
+            logo=local_logo or default_logo_uri()
+        brand=render_header(header,name=brand_name,version=brand_version,updated=brand_updated,logo_uri=logo)
+    elif profile is not None:
         profile.validate()
         template = profile.base
         if source.suffix.lower() in MARKDOWN_EXTENSIONS:
@@ -74,7 +93,7 @@ def render_html(source: Path, *, title: str | None = None,
     style += "\n" + Path(__file__).with_name("templates").joinpath(template + ".css").read_text(encoding="utf-8")
     if profile is not None:
         style += "\n" + profile.css()
-    if template == "granulex" or profile is not None:
+    if template in ("granulex","phantom") or profile is not None:
         style = bundled_font_css() + "\n" + style
     # A linked custom stylesheet retains its own base URL for relative assets.
     custom = f'<link rel="stylesheet" href="{escape(css.resolve().as_uri(), quote=True)}">' if css else ""

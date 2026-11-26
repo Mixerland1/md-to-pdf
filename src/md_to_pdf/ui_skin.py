@@ -4,6 +4,9 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageOps, ImageTk, ImageDraw, ImageFilter
 import sys
+import time
+import math
+import re
 from functools import lru_cache
 
 ASSETS = Path(__file__).with_name("assets")
@@ -150,6 +153,10 @@ class Backdrop(tk.Canvas):
         self.center=None
         self.card_item=None
         self.card_photo=None
+        self.motion_job=None
+        self.motion_tracks=[]
+        self.motion_items=[]
+        self.motion_origin=time.monotonic()
         try:
             if asset.endswith(".svg"):
                 self.original=vector_image(asset,1920 if not banner else 1920,1080 if not banner else 96)
@@ -160,6 +167,11 @@ class Backdrop(tk.Canvas):
             pass
         self.image_item=self.create_image(0,0,anchor="nw")
         self.bind("<Configure>",self._schedule)
+        self.bind("<Map>",self._start_motion,add="+")
+        self.bind("<Unmap>",self._stop_motion,add="+")
+        self.bind("<Destroy>",self._stop_motion,add="+")
+        if not banner and asset=="welcome.svg":
+            self.motion_tracks=welcome_tracks()
     def center_widget(self, widget):
         self.card_item=self.create_image(0,0,anchor="center")
         self.center=self.create_window(0,0,window=widget,anchor="center")
@@ -188,7 +200,7 @@ class Backdrop(tk.Canvas):
             self.photo=ImageTk.PhotoImage(im,master=self)
             self.itemconfigure(self.image_item,image=self.photo)
         if self.center is not None:
-            x,y=w*.45,h*.48
+            x,y=w/2,h/2
             self.coords(self.center,x,y)
             cw=max(self.center_content.winfo_reqwidth(),self.center_content.winfo_width())+76
             ch=max(self.center_content.winfo_reqheight(),self.center_content.winfo_height())+76
@@ -197,6 +209,62 @@ class Backdrop(tk.Canvas):
             self.coords(self.card_item,x,y)
             self.tag_lower(self.card_item,self.center)
         self.tag_lower(self.image_item)
+        self._start_motion()
+
+    def _start_motion(self,event=None):
+        if self.motion_tracks and self.motion_job is None and self.winfo_ismapped():
+            self.motion_job=self.after(40,self._animate)
+    def _stop_motion(self,event=None):
+        if self.motion_job is not None:
+            self.after_cancel(self.motion_job)
+            self.motion_job=None
+    def _animate(self):
+        self.motion_job=None
+        if not self.winfo_ismapped():
+            return
+        w,h=self.winfo_width(),self.winfo_height()
+        scale=max(w/640,h/360)
+        dx=(w-640*scale)/2
+        dy=(h-360*scale)/2
+        elapsed=time.monotonic()-self.motion_origin
+        if not self.motion_items:
+            for _ in self.motion_tracks:
+                group=[self.create_line(0,0,0,0,fill=c,width=width,capstyle="round",joinstyle="round")
+                       for c,width in (("#c2d5ed",4),("#dcecff",2.5),("#f7fbff",1.5))]
+                self.motion_items.append(group)
+                for item in group:
+                    if self.card_item is not None:
+                        self.tag_lower(item,self.card_item)
+        for (points,duration,offset,red),group in zip(self.motion_tracks,self.motion_items):
+            end=int(((elapsed+offset)%duration)/duration*(len(points)+20))
+            for j,item in enumerate(group):
+                begin=max(0,end-(13-j*3))
+                stop=min(len(points),end)
+                if stop-begin<2:
+                    self.itemconfigure(item,state="hidden")
+                    continue
+                coords=[v for x,y in points[begin:stop] for v in (x*scale+dx,y*scale+dy)]
+                self.coords(item,*coords)
+                self.itemconfigure(item,state="normal",fill=("#e7a9b7","#f2c1cb","#fff2e8")[j] if red else ("#c2d5ed","#dcecff","#ffffff")[j])
+        self.motion_job=self.after(40,self._animate)
+
+
+def welcome_tracks():
+    """Use the actual cubic tracks in the artwork, not unrelated overlay lines."""
+    svg=(ASSETS/"welcome.svg").read_text(encoding="utf-8")
+    matches=re.findall(r'<path d="M(-?[\d.]+) ([\d.-]+) C ([\d.-]+) ([\d.-]+), ([\d.-]+) ([\d.-]+), ([\d.-]+) ([\d.-]+)" fill="none"',svg)
+    tracks=[]
+    for index,duration,offset,red in ((3,13,1,False),(9,17,7,False),(17,20,12,False),(23,18,9,True)):
+        if index>=len(matches):
+            continue
+        x0,y0,x1,y1,x2,y2,x3,y3=map(float,matches[index])
+        points=[]
+        for i in range(241):
+            t=i/240;u=1-t
+            points.append((u**3*x0+3*u*u*t*x1+3*u*t*t*x2+t**3*x3,
+                           u**3*y0+3*u*u*t*y1+3*u*t*t*y2+t**3*y3))
+        tracks.append((points,duration,offset,red))
+    return tracks
 
 
 def toolbar_icon(master,name,size=22):
@@ -229,6 +297,36 @@ def toolbar_icon(master,name,size=22):
                 if i==1: line([(3,y-1),(4.5,y-2),(4.5,y+2)],BLUE,1)
                 elif i==2: line([(3,y-1),(4,y-2),(5.5,y-1),(3,y+2),(5.5,y+2)],BLUE,1)
                 else: line([(3,y-2),(5.5,y-2),(4,y),(5.5,y+1),(4,y+2),(3,y+2)],BLUE,1)
+    elif name=="open":
+        poly([(2,6),(9,6),(11,8),(21,8),(21,19),(2,19)],"#d3a75d",INK)
+        poly([(2,19),(5,10),(23,10),(20,19)],"#f3ce80",INK)
+    elif name=="save":
+        poly([(3,3),(18,3),(21,6),(21,21),(3,21)],"#779ac4",INK)
+        poly([(7,3),(16,3),(16,10),(7,10)],"#ffffff",INK)
+        poly([(6,13),(18,13),(18,21),(6,21)],"#eaf1fa",INK)
+    elif name=="paste":
+        poly([(5,4),(19,4),(19,22),(5,22)],"#ffffff",INK)
+        poly([(8,2),(16,2),(17,7),(7,7)],"#a7bfdc",INK)
+        for y in (11,15,18):
+            line([(8,y),(16,y)],INK,1.3)
+    elif name=="pdf":
+        poly([(5,2),(15,2),(20,7),(20,22),(5,22)],"#ffffff",INK)
+        line([(15,2),(15,7),(20,7)],INK,1)
+        poly([(3,12),(22,12),(22,18),(3,18)],"#b73b47")
+        # PDF pictogram, with recognizable tiny letter strokes.
+        for x,points in ((5,[(0,4),(0,0),(3,0),(3,2),(0,2)]),(11,[(0,4),(0,0),(2,0),(3,1),(3,3),(2,4),(0,4)]),(17,[(0,4),(0,0),(3,0),(0,0),(0,2),(2,2)])):
+            line([(x+a,13+b) for a,b in points],"#ffffff",.8)
+    elif name in ("undo","redo","back"):
+        pts=[(5,11),(10,6),(10,10),(16,10),(20,13),(20,17),(15,20)]
+        if name=="redo":pts=[(24-x,y) for x,y in pts]
+        if name=="back":pts=[(13,5),(6,12),(13,19),(6,12),(21,12)]
+        line(pts,INK,2)
+    elif name=="clear":
+        line([(5,6),(19,6),(17,21),(7,21),(5,6)],INK,1.5)
+        line([(3,6),(21,6),(15,6),(15,3),(9,3),(9,6)],INK,1.5)
+    elif name=="update":
+        line([(12,3),(12,16),(6,10),(12,16),(18,10)],INK,2)
+        line([(4,17),(4,21),(20,21),(20,17)],INK,1.6)
     elif name=="table":
         d.rounded_rectangle((2*k,3*k,21*k,21*k),radius=2*k,fill="#ffffff",outline=INK,width=k)
         d.rectangle((3*k,4*k,20*k,8*k),fill="#a7bfdc")

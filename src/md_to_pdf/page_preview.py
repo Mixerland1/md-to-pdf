@@ -116,7 +116,9 @@ class PagePreview(ttk.Frame):
         self.canvas.grid(sticky="nsew")
         self.scroll=ttk.Scrollbar(self,orient="vertical",command=self._scroll)
         self.scroll.grid(row=0,column=1,sticky="ns")
-        self.canvas.configure(yscrollcommand=self.scroll.set)
+        self.horizontal=ttk.Scrollbar(self,orient="horizontal",command=self.canvas.xview)
+        self.horizontal.grid(row=1,column=0,sticky="ew")
+        self.canvas.configure(yscrollcommand=self.scroll.set,xscrollcommand=self.horizontal.set)
         self.on_select=on_select
         self.on_context=on_context
         self.doc=None
@@ -130,6 +132,10 @@ class PagePreview(ttk.Frame):
         self.handle_drag=False
         self.handles=[]
         self.scale=1.15
+        self.zoom=1.0
+        self.canvas.bind("<Control-MouseWheel>",self._zoom_wheel)
+        self.canvas.bind("<Control-Button-4>",lambda e:self._zoom_at(e,1.15))
+        self.canvas.bind("<Control-Button-5>",lambda e:self._zoom_at(e,1/1.15))
         self.canvas.bind("<Configure>",self._resize)
         self.canvas.bind("<MouseWheel>",self._wheel)
         self.canvas.bind("<Button-4>",lambda e:self._scroll("scroll",-3,"units"))
@@ -179,9 +185,17 @@ class PagePreview(ttk.Frame):
         width=max(200,self.canvas.winfo_width())
         page=self.doc[0]
         try:
-            self.scale=max(.2,min(1.6,(width-40)/page.get_width()))
+            self.scale=max(.2,min(4.0,min(1.6,(width-40)/page.get_width())*self.zoom))
         finally:
             page.close()
+        sizes=[]
+        for i in range(len(self.doc)):
+            pg=self.doc[i]
+            try:
+                sizes.append(pg.get_size())
+            finally:
+                pg.close()
+        content_width=max(width,max(w*self.scale for w,h in sizes)+40)
         y=20
         for i in range(len(self.doc)):
             page=self.doc[i]
@@ -190,11 +204,11 @@ class PagePreview(ttk.Frame):
             finally:
                 page.close()
             w,h=w*self.scale,h*self.scale
-            x=max(12,(width-w)/2)
+            x=max(12,(content_width-w)/2)
             self.page_boxes.append((x,y,w,h))
             self.canvas.create_rectangle(x,y,x+w,y+h,fill="white",outline="#c5d0df")
             y+=h+20
-        self.canvas.configure(scrollregion=(0,0,width,y))
+        self.canvas.configure(scrollregion=(0,0,content_width,y))
         self._draw_selection()
 
     def _visible(self):
@@ -228,7 +242,34 @@ class PagePreview(ttk.Frame):
         self.canvas.yview(*args)
         self._visible()
 
+    def _zoom_wheel(self,event):
+        if event.delta:
+            self._zoom_at(event,1.15**(max(1,abs(event.delta)//120)*(1 if event.delta>0 else -1)))
+        return "break"
+
+    def _zoom_at(self,event,factor):
+        if self.doc is None:
+            return "break"
+        x,y=self.canvas.canvasx(event.x),self.canvas.canvasy(event.y)
+        anchor=next(((i,(x-left)/self.scale,(y-top)/self.scale)
+                     for i,(left,top,w,h) in enumerate(self.page_boxes) if top<=y<=top+h),None)
+        old_fraction=self.canvas.yview()[0]
+        self.zoom=max(.35,min(4.0,self.zoom*factor))
+        self._layout()
+        if anchor:
+            i,px,py=anchor
+            left,top,_,_=self.page_boxes[i]
+            _,_,rw,rh=map(float,self.canvas.cget("scrollregion").split())
+            self.canvas.xview_moveto(max(0,(left+px*self.scale-event.x)/rw))
+            self.canvas.yview_moveto(max(0,(top+py*self.scale-event.y)/rh))
+        else:
+            self.canvas.yview_moveto(old_fraction)
+        self._visible()
+        return "break"
+
     def _wheel(self,event):
+        if event.state & 0x4:
+            return self._zoom_wheel(event)
         delta=event.delta
         if delta:
             self._scroll("scroll",-max(1,abs(delta)//120)*(1 if delta>0 else -1)*3,"units")

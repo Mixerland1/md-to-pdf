@@ -13,6 +13,7 @@ import tkinter.font as tkfont
 from tkinter import ttk,filedialog,messagebox
 from . import __version__
 from .inputs import EXTENSIONS
+from .import_text import COPY_EXTENSIONS,copy_document
 from .profiles import Profile,load_profile,list_profiles
 from dataclasses import replace
 from .profile_editor import edit_profile,builtin_profile
@@ -93,7 +94,7 @@ def main():
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
     state={"workspace":None,"result":None,"generation":0,"rendering":False,
-           "dirty":False,"importing":False,"configuring":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
+           "dirty":False,"home":True,"importing":False,"configuring":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
     profiles=list_profiles()
     preset=tk.StringVar(value="Технический")
     role=tk.StringVar(value="Стиль фрагмента")
@@ -119,10 +120,10 @@ def main():
         owner=parent or root
         return confirm_changes(owner,state["dirty"],lambda:save(parent=owner,reflow=False))
     def choose():
-        name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx")])
+        name=filedialog.askopenfilename(parent=root,filetypes=[("Документы","*.md *.markdown *.mdown *.txt *.docx *.pdf *.xlsx *.xls *.csv"),("Все файлы","*.*")])
         if name:
             load(name)
-    open_button=ttk.Button(left_tools,text="Открыть",command=choose,style="Toolbar.TButton")
+    open_button=ttk.Button(left_tools,text="Открыть",command=lambda:go_home(),style="Toolbar.TButton")
     editor_bar=ttk.Frame(bar,style="Toolbar.TFrame")
     combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles,*PRESET_ACTIONS),state="readonly",width=17,style="Toolbar.TCombobox")
     combo.pack(side="left",padx=(8,2))
@@ -159,10 +160,21 @@ def main():
             tip[0]=tk.Toplevel(root)
             tip[0].wm_overrideredirect(True)
             tip[0].wm_geometry(f"+{widget.winfo_rootx()}+{widget.winfo_rooty()+widget.winfo_height()+5}")
-            ttk.Label(tip[0],text=label,padding=6,relief="solid").pack()
-        widget.bind("<Enter>",lambda e:pending.__setitem__(0,widget.after(600,show)))
+            ttk.Label(tip[0],text=label() if callable(label) else label,padding=6,relief="solid").pack()
+        def enter(_=None):
+            hide()
+            pending[0]=widget.after(600,show)
+        widget.bind("<Enter>",enter)
+        widget.bind("<Unmap>",hide,add="+")
         widget.bind("<Leave>",hide)
         widget.bind("<ButtonPress>",hide,add="+")
+    def iconify(widget,name):
+        icon=toolbar_icon(root,name)
+        widget.configure(image=icon,compound="none")
+        widget.image=icon
+        tooltip(widget,lambda:widget.cget("text"))
+        return widget
+    iconify(open_button,"open")
     tooltip(brush_button,"Формат по образцу")
     brush_button.pack(side="left",padx=(0,4))
     def structure_button(name,label,command):
@@ -178,22 +190,27 @@ def main():
     editor_paste=ttk.Button(left_tools,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     save_button=ttk.Button(right_tools,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
 
-    ttk.Button(editor_bar,text="↶",width=3,style="Toolbar.TButton",command=lambda:history(False)).pack(side="left")
-    ttk.Button(editor_bar,text="↷",width=3,style="Toolbar.TButton",command=lambda:history(True)).pack(side="left",padx=(2,0))
+    iconify(ttk.Button(editor_bar,text="Отменить (Ctrl+Z)",style="Toolbar.TButton",command=lambda:history(False)),"undo").pack(side="left")
+    iconify(ttk.Button(editor_bar,text="Повторить (Ctrl+Y)",style="Toolbar.TButton",command=lambda:history(True)),"redo").pack(side="left",padx=(2,0))
     export_button=ttk.Button(right_tools,text="Экспорт PDF",command=lambda:export(),style="Accent.TButton")
     update_button=ttk.Button(right_tools,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
+    for widget,name in ((editor_paste,"paste"),(save_button,"save"),(export_button,"pdf"),(update_button,"update")):
+        iconify(widget,name)
+    for widget,label in ((combo,"Пресет документа"),(styles,"Стиль фрагмента"),(font_box,"Шрифт"),(size_box,"Размер шрифта, пт")):
+        tooltip(widget,label)
     empty=Backdrop(root,"welcome.svg")
     empty.grid(row=1,sticky="nsew")
     welcome=ttk.Frame(empty,padding=(18,12),style="Welcome.TFrame")
     ttk.Label(welcome,text="MD to PDF",font=("TkDefaultFont",24,"bold"),style="Welcome.TLabel").pack()
     ttk.Label(welcome,text="Откройте или перетащите документ",style="Welcome.TLabel",padding=(0,8,0,0)).pack()
-    ttk.Label(welcome,text="MD · TXT · DOCX",style="Welcome.TLabel",padding=(0,0,0,14)).pack()
+    ttk.Label(welcome,text="MD · TXT · PDF · DOCX · XLSX · XLS · CSV",style="Welcome.TLabel",padding=(0,0,0,14)).pack()
     actions=ttk.Frame(welcome,style="Welcome.TFrame")
     actions.pack()
     drop=ttk.Button(actions,text="Открыть",command=choose,style="Accent.TButton")
     drop.pack(side="left",padx=(0,8))
     paste_button=ttk.Button(actions,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     paste_button.pack(side="left")
+    back_button=iconify(ttk.Button(actions,text="Вернуться к документу",command=lambda:back_to_document(),style="Toolbar.TButton"),"back")
     empty.center_widget(welcome)
     empty.bind("<Button-1>",lambda e:empty.focus_set())
     preview=PagePreview(root,lambda ranges:select(ranges),lambda e:context(e))
@@ -206,12 +223,18 @@ def main():
         else:
             status_label.grid_remove()
     def load(name):
-        if state["updating"] or state["configuring"] or not confirm_input_discard() or not discard_ok():
+        if state["updating"] or state["configuring"] or not confirm_input_discard():
             return
         try:
             path=Path(name).resolve()
-            if not path.is_file() or path.suffix.lower() not in EXTENSIONS:
-                raise ValueError("Выберите один файл MD, TXT или DOCX")
+            if not path.is_file() or path.suffix.lower() not in EXTENSIONS|COPY_EXTENSIONS:
+                raise ValueError("Выберите MD, TXT, PDF, DOCX, XLSX, XLS или CSV")
+            if path.suffix.lower() in COPY_EXTENSIONS:
+                value=copy_document(path)
+                show_input(value)
+                return
+            if not discard_ok():
+                return
             ws=Workspace(path,**options())
             try:
                 saved=ws.restore()
@@ -235,7 +258,7 @@ def main():
     top=ttk.Frame(input_content,style="Welcome.TFrame")
     top.grid(row=0,sticky="ew",pady=(0,12))
     ttk.Label(top,text="Текст документа",font=("TkDefaultFont",16,"bold"),style="Welcome.TLabel").pack(side="left")
-    ttk.Button(top,text="Открыть файл…",style="Toolbar.TButton",command=choose).pack(side="right")
+    iconify(ttk.Button(top,text="Открыть файл…",style="Toolbar.TButton",command=choose),"open").pack(side="right")
     text_surface=RoundedPanel(input_content,radius=14,shadow=False,padding=14,background="#ffffff")
     text_surface.grid(row=1,sticky="nsew")
     area=text_surface.content
@@ -267,16 +290,49 @@ def main():
             field.delete("1.0","end")
             field.insert("1.0",value)
         field.focus_set()
-    def cancel_input():
+    def go_home():
+        if state["updating"] or state["configuring"]:
+            return
+        state["home"]=True
         state["importing"]=False
+        cancel_brush()
         input_view.grid_remove()
-        if state["workspace"] is not None:
+        preview.grid_remove()
+        left_tools.grid_remove()
+        editor_bar.grid_remove()
+        save_button.pack_forget()
+        export_button.pack_forget()
+        chrome.grid_remove()
+        if state["update"]:
             chrome.grid(row=0,sticky="ew")
-            preview.grid(row=1,sticky="nsew")
+        if state["workspace"] is not None:
+            back_button.pack(side="left",padx=(8,0))
         else:
-            empty.grid(row=1,sticky="nsew")
-            if state["update"]:
-                chrome.grid(row=0,sticky="ew")
+            back_button.pack_forget()
+        empty.grid(row=1,sticky="nsew")
+        message()
+        empty.focus_set()
+
+    def back_to_document():
+        if state["workspace"] is None:
+            return
+        state["home"]=False
+        state["importing"]=False
+        empty.grid_remove()
+        input_view.grid_remove()
+        left_tools.grid()
+        chrome.grid(row=0,sticky="ew")
+        export_button.pack(side="right")
+        save_button.pack(side="right",padx=4)
+        preview.grid(row=1,sticky="nsew")
+        arrange_toolbar()
+        message()
+
+    def cancel_input():
+        if state["home"] or state["workspace"] is None:
+            go_home()
+        else:
+            back_to_document()
         message()
     def accept_input():
         if state["updating"] or not state["importing"]:
@@ -298,8 +354,8 @@ def main():
         if previous and not discard_ok():
             return
         show_workspace(ws,pasted=True)
-    ttk.Button(input_actions,text="Из буфера",command=refill,style="Toolbar.TButton").pack(side="left")
-    ttk.Button(input_actions,text="Очистить",command=lambda:field.delete("1.0","end"),style="Toolbar.TButton").pack(side="left",padx=6)
+    iconify(ttk.Button(input_actions,text="Из буфера",command=refill,style="Toolbar.TButton"),"paste").pack(side="left")
+    iconify(ttk.Button(input_actions,text="Очистить",command=lambda:field.delete("1.0","end"),style="Toolbar.TButton"),"clear").pack(side="left",padx=6)
     ttk.Button(input_actions,text="Открыть в редакторе",style="Accent.TButton",command=accept_input).pack(side="right")
     ttk.Button(input_actions,text="Отмена",command=cancel_input,style="Toolbar.TButton").pack(side="right",padx=6)
     def paste(_=None,fresh=False):
@@ -309,7 +365,9 @@ def main():
             field.focus_set()
             return
         previous=state["workspace"]
-        initial=previous.source.read_text(encoding="utf-8") if state["pasted"] and previous and not fresh else clipboard()
+        initial=previous.source.read_text(encoding="utf-8") if state["pasted"] and previous and not fresh and not state["home"] else clipboard()
+        show_input(initial)
+    def show_input(initial):
         field.delete("1.0","end")
         field.insert("1.0",initial)
         field.edit_reset()
@@ -334,7 +392,7 @@ def main():
         return "break"
 
     def arrange_toolbar(_=None):
-        if state["workspace"] is None:
+        if state["workspace"] is None or state["home"] or state["importing"] or state["configuring"]:
             return
         need=left_tools.winfo_reqwidth()+editor_bar.winfo_reqwidth()+right_tools.winfo_reqwidth()+30
         if root.winfo_width()>=need:
@@ -347,13 +405,14 @@ def main():
     def show_workspace(ws,pasted):
         nonlocal active_label
         active_label=preset.get()
-        state.update(workspace=ws,dirty=pasted,importing=False,pasted=pasted,paste_pdf=None,result=None,
+        state.update(workspace=ws,dirty=pasted,home=False,importing=False,pasted=pasted,paste_pdf=None,result=None,
                      selection=[],brush=None,restore_selection=[])
         cancel_brush()
         update_fields()
         input_view.grid_remove()
         empty.grid_remove()
         chrome.grid(row=0,sticky="ew")
+        left_tools.grid()
         if not open_button.winfo_manager():
             open_button.pack(side="left")
         if not editor_paste.winfo_manager():
@@ -695,7 +754,7 @@ def main():
         ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=6,pady=6)
         dialog.grab_set()
     if drag:
-        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas,input_view,input_content,text_surface,area,field):
+        for widget in (root,empty,welcome,drop,paste_button,editor_paste,back_button,preview.canvas,input_view,input_content,text_surface,area,field):
             widget.drop_target_register(DND_FILES)
             def dropped(event):
                 paths=root.tk.splitlist(event.data)
@@ -751,7 +810,8 @@ def main():
                             state["result"]=value
                             preview.restore_selection(state["restore_selection"])
                             export_button.configure(state="normal")
-                            message("Некоторые правки не применимы к этому пресету." if state["workspace"].skipped else "")
+                            if not state["home"] and not state["importing"]:
+                                message("Некоторые правки не применимы к этому пресету." if state["workspace"].skipped else "")
                         except Exception as exc:
                             message(str(exc))
                     else:
@@ -761,6 +821,11 @@ def main():
                     update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
                     if not state["importing"] and not state["configuring"]:
                         chrome.grid(row=0,sticky="ew")
+                    if state["home"]:
+                        left_tools.grid_remove()
+                        editor_bar.grid_remove()
+                        save_button.pack_forget()
+                        export_button.pack_forget()
                     update_button.pack(side="right",padx=6)
                     arrange_toolbar()
                 elif kind=="update-exit":
@@ -787,14 +852,14 @@ def main():
         preview.close()
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
-    root.bind("<Escape>",lambda e:profile_cancel() if state["configuring"] and profile_cancel else cancel_input() if state["importing"] else cancel_brush())
-    root.bind("<Control-o>",lambda e:choose())
+    root.bind("<Escape>",lambda e:profile_cancel() if state["configuring"] and profile_cancel else cancel_input() if state["importing"] else back_to_document() if state["home"] else cancel_brush())
+    root.bind("<Control-o>",lambda e:choose() if state["home"] or state["importing"] else go_home())
     root.bind("<Control-v>",paste_shortcut)
     if sys.platform=="darwin":
         root.bind("<Command-v>",paste_shortcut)
-    root.bind("<Control-s>",lambda e:None if state["importing"] or state["configuring"] else save())
-    root.bind("<Control-z>",lambda e:None if state["importing"] or state["configuring"] else history(False))
-    root.bind("<Control-y>",lambda e:None if state["importing"] or state["configuring"] else history(True))
+    root.bind("<Control-s>",lambda e:None if state["importing"] or state["configuring"] or state["home"] else save())
+    root.bind("<Control-z>",lambda e:None if state["importing"] or state["configuring"] or state["home"] else history(False))
+    root.bind("<Control-y>",lambda e:None if state["importing"] or state["configuring"] or state["home"] else history(True))
     root.after(80,poll)
     try:
         root.mainloop()

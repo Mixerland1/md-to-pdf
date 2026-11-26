@@ -1,0 +1,3 @@
+# 0.4.0 beta 11 — rounded surfaces
+
+Welcome drop area is a white rounded card with 18 px corners, thin blue-gray border and soft shadow. Inline text import uses a rounded outer card and 14 px rounded text surface, with the same native editable text field inside. Existing controls, drag/drop, clipboard and export behavior remain. Actual PDF pages remain rectangular. Windows application and custom dialog frames request native rounded corners through DWM where supported (Windows 11); other platforms retain OS decoration. System file pickers, native message boxes and maximized windows remain controlled by the OS. No custom title-bar or fake button windows. Manual desktop visual acceptance pending.

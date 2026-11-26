@@ -2,13 +2,14 @@
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
-from PIL import Image, ImageOps, ImageTk
+from PIL import Image, ImageOps, ImageTk, ImageDraw, ImageFilter
+import sys
 from functools import lru_cache
 
 ASSETS = Path(__file__).with_name("assets")
 INK = "#203653"
 SURFACE = "#edf2fa"
-PANEL = "#f7f9fd"
+PANEL = "#ffffff"
 BORDER = "#bac9df"
 BLUE = "#355d91"
 
@@ -34,7 +35,85 @@ def vector_image(asset, width, height):
         finally:
             page.close()
 
+def round_window(window):
+    """Keep native window controls; request rounded corners on Windows 11."""
+    if sys.platform!="win32":
+        return
+    def apply(event=None):
+        if event is not None and event.widget is not window:
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+            get_ancestor=ctypes.windll.user32.GetAncestor
+            get_ancestor.argtypes=(wintypes.HWND,wintypes.UINT)
+            get_ancestor.restype=wintypes.HWND
+            hwnd=get_ancestor(window.winfo_id(),2)
+            if hwnd:
+                preference=ctypes.c_int(2)  # DWMWCP_ROUND
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    wintypes.HWND(hwnd),33,ctypes.byref(preference),ctypes.sizeof(preference))
+        except (AttributeError,OSError,tk.TclError):
+            pass
+    window.bind("<Map>",apply,add="+")
+    window.after_idle(apply)
+
+
+@lru_cache(maxsize=8)
+def rounded_art(width,height,radius=18,shadow=True,border=BORDER):
+    """Antialiased rounded card with transparent corners, soft shadow."""
+    width,height=max(1,int(width)),max(1,int(height))
+    scale=2
+    inset=12 if shadow else 1
+    w,h=width*scale,height*scale
+    pad=inset*scale
+    radius=max(1,min(radius*scale,(min(w,h)-2*pad)//2))
+    box=(pad,pad,max(pad,w-pad-1),max(pad,h-pad-1))
+    result=Image.new("RGBA",(w,h),(0,0,0,0))
+    if shadow and min(width,height)>30:
+        layer=Image.new("RGBA",(w,h),(0,0,0,0))
+        ImageDraw.Draw(layer).rounded_rectangle((box[0],box[1]+4*scale,box[2],box[3]+4*scale),
+            radius=radius,fill=(32,54,83,40))
+        result.alpha_composite(layer.filter(ImageFilter.GaussianBlur(4*scale)))
+    ImageDraw.Draw(result).rounded_rectangle(box,radius=radius,fill=PANEL,outline=border,width=scale)
+    return result.resize((width,height),Image.Resampling.LANCZOS)
+
+
+class RoundedPanel(tk.Canvas):
+    """Real widgets inside an inset surface; the visible perimeter is rounded."""
+    def __init__(self,parent,*,radius=18,shadow=True,padding=24,background=SURFACE,**kwargs):
+        super().__init__(parent,background=background,highlightthickness=0,borderwidth=0,**kwargs)
+        self.radius=radius
+        self.shadow=shadow
+        self.inset=max(radius+2,padding)+(12 if shadow else 1)
+        self.photo=None
+        self.pending=None
+        self.art=self.create_image(0,0,anchor="nw")
+        self.content=ttk.Frame(self,style="Welcome.TFrame")
+        self.child=self.create_window(self.inset,self.inset,window=self.content,anchor="nw")
+        self.bind("<Configure>",self._schedule)
+        self.bind("<Destroy>",self._cancel,add="+")
+    def _cancel(self,event=None):
+        if self.pending is not None:
+            self.after_cancel(self.pending)
+            self.pending=None
+    def _schedule(self,event=None):
+        self._cancel()
+        self.pending=self.after(25,self._draw)
+    def _draw(self):
+        self.pending=None
+        w,h=self.winfo_width(),self.winfo_height()
+        if w<=2*self.inset or h<=2*self.inset:
+            return
+        self.photo=ImageTk.PhotoImage(rounded_art(w,h,self.radius,self.shadow),master=self)
+        self.itemconfigure(self.art,image=self.photo)
+        self.itemconfigure(self.child,width=w-2*self.inset,height=h-2*self.inset)
+        self.tag_lower(self.art)
+
+
 def configure_theme(root):
+    root.configure(background=SURFACE)
+    round_window(root)
     style = ttk.Style(root)
     if "clam" in style.theme_names():
         style.theme_use("clam")
@@ -69,6 +148,8 @@ class Backdrop(tk.Canvas):
         self.photo=None
         self.pending=None
         self.center=None
+        self.card_item=None
+        self.card_photo=None
         try:
             if asset.endswith(".svg"):
                 self.original=vector_image(asset,1920 if not banner else 1920,1080 if not banner else 96)
@@ -80,7 +161,10 @@ class Backdrop(tk.Canvas):
         self.image_item=self.create_image(0,0,anchor="nw")
         self.bind("<Configure>",self._schedule)
     def center_widget(self, widget):
+        self.card_item=self.create_image(0,0,anchor="center")
         self.center=self.create_window(0,0,window=widget,anchor="center")
+        self.center_content=widget
+        widget.bind("<Configure>",self._schedule,add="+")
         self._draw()
     def _schedule(self,event=None):
         if self.pending is not None:
@@ -104,5 +188,12 @@ class Backdrop(tk.Canvas):
             self.photo=ImageTk.PhotoImage(im,master=self)
             self.itemconfigure(self.image_item,image=self.photo)
         if self.center is not None:
-            self.coords(self.center,w*.45,h*.48)
+            x,y=w*.45,h*.48
+            self.coords(self.center,x,y)
+            cw=max(self.center_content.winfo_reqwidth(),self.center_content.winfo_width())+76
+            ch=max(self.center_content.winfo_reqheight(),self.center_content.winfo_height())+76
+            self.card_photo=ImageTk.PhotoImage(rounded_art(cw,ch,18,True),master=self)
+            self.itemconfigure(self.card_item,image=self.card_photo)
+            self.coords(self.card_item,x,y)
+            self.tag_lower(self.card_item,self.center)
         self.tag_lower(self.image_item)

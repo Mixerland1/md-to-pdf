@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from md_to_pdf import gui
 from md_to_pdf.page_preview import PagePreview
-from md_to_pdf.ui_skin import Backdrop
+from md_to_pdf.ui_skin import Backdrop,RoundedPanel
 
 def descendants(widget):
     for child in widget.winfo_children():
@@ -28,6 +28,7 @@ try:
             assert not any(isinstance(w,tk.Listbox) for w in descendants(root))
             assert any(isinstance(w,Backdrop) and w.original is not None for w in descendants(root))
             assert "Вставить текст" in buttons(root)
+            assert any(isinstance(w,Backdrop) and w.card_photo is not None for w in descendants(root))
             buttons(root)["Открыть"].invoke()
             deadline=time.monotonic()+30
             preview=next(w for w in descendants(root) if isinstance(w,PagePreview))
@@ -79,7 +80,11 @@ try:
             root.update()
             assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
             field=next(w for w in descendants(root) if isinstance(w,tk.Text) and w.winfo_ismapped())
+            deadline=time.monotonic()+3
+            while field.winfo_height()<=250 and time.monotonic()<deadline:
+                root.update();time.sleep(.03)
             assert field.winfo_height()>250
+            assert sum(isinstance(w,RoundedPanel) and w.winfo_ismapped() for w in descendants(root))==2
             assert "Новый текст" in field.get("1.0","end")
             field.delete("1.0","end")
             field.insert("1.0","# Из буфера\n\nИсправленный текст.")

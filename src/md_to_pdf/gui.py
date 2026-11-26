@@ -16,7 +16,7 @@ from .inputs import EXTENSIONS
 from .profiles import load_profile,list_profiles
 from .profile_editor import manage_profiles
 from .workspace import Workspace,render_snapshot,export_bytes,write_pdf_bytes
-from .ui_skin import Backdrop,configure_theme,SURFACE,INK
+from .ui_skin import Backdrop,RoundedPanel,round_window,configure_theme,SURFACE,INK
 from .page_preview import PagePreview
 
 BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex"}
@@ -31,6 +31,7 @@ def ask_save_changes(parent):
     """Return save, discard or cancel; Escape and the window close mean cancel."""
     result="cancel"
     dialog=tk.Toplevel(parent)
+    round_window(dialog)
     dialog.title("MD to PDF")
     dialog.transient(parent)
     dialog.resizable(False,False)
@@ -173,7 +174,7 @@ def main():
     update_button=ttk.Button(right_tools,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
     empty=Backdrop(root,"welcome.svg")
     empty.grid(row=1,sticky="nsew")
-    welcome=ttk.Frame(empty,padding=(26,22),style="Welcome.TFrame")
+    welcome=ttk.Frame(empty,padding=(18,12),style="Welcome.TFrame")
     ttk.Label(welcome,text="MD to PDF",font=("TkDefaultFont",24,"bold"),style="Welcome.TLabel").pack()
     ttk.Label(welcome,text="Откройте или перетащите документ",style="Welcome.TLabel",padding=(0,8,0,0)).pack()
     ttk.Label(welcome,text="MD · TXT · DOCX",style="Welcome.TLabel",padding=(0,0,0,14)).pack()
@@ -217,26 +218,27 @@ def main():
         show_workspace(ws,pasted=False)
 
     # Importing text is a view in the same window, never a Toplevel.
-    input_view=ttk.Frame(root,style="Welcome.TFrame",padding=(28,22))
-    input_view.columnconfigure(0,weight=1)
-    input_view.rowconfigure(1,weight=1)
-    top=ttk.Frame(input_view,style="Welcome.TFrame")
+    input_view=RoundedPanel(root,padding=24,radius=18)
+    input_content=input_view.content
+    input_content.columnconfigure(0,weight=1)
+    input_content.rowconfigure(1,weight=1)
+    top=ttk.Frame(input_content,style="Welcome.TFrame")
     top.grid(row=0,sticky="ew",pady=(0,12))
     ttk.Label(top,text="Текст документа",font=("TkDefaultFont",16,"bold"),style="Welcome.TLabel").pack(side="left")
     ttk.Button(top,text="Открыть файл…",style="Toolbar.TButton",command=choose).pack(side="right")
-    area=ttk.Frame(input_view)
-    area.grid(row=1,sticky="nsew")
+    text_surface=RoundedPanel(input_content,radius=14,shadow=False,padding=14,background="#ffffff")
+    text_surface.grid(row=1,sticky="nsew")
+    area=text_surface.content
     area.columnconfigure(0,weight=1)
     area.rowconfigure(0,weight=1)
     field=tk.Text(area,wrap="word",undo=True,exportselection=False,padx=16,pady=16,
                   font=("TkDefaultFont",12),foreground=INK,background="#ffffff",
-                  relief="flat",highlightthickness=1,highlightbackground="#bac9df",
-                  highlightcolor="#355d91",insertbackground=INK)
+                  relief="flat",highlightthickness=0,insertbackground=INK)
     field.grid(row=0,column=0,sticky="nsew")
     scroll=ttk.Scrollbar(area,orient="vertical",command=field.yview)
     scroll.grid(row=0,column=1,sticky="ns")
     field.configure(yscrollcommand=scroll.set)
-    input_actions=ttk.Frame(input_view,style="Welcome.TFrame")
+    input_actions=ttk.Frame(input_content,style="Welcome.TFrame")
     input_actions.grid(row=2,sticky="ew",pady=(12,0))
     def clipboard():
         try:
@@ -306,7 +308,7 @@ def main():
         empty.grid_remove()
         preview.grid_remove()
         chrome.grid_remove()
-        input_view.grid(row=1,sticky="nsew")
+        input_view.grid(row=1,sticky="nsew",padx=14,pady=12)
         message()
         field.focus_set()
     field.bind("<Control-Return>",lambda e:(accept_input(),"break")[1])
@@ -543,6 +545,7 @@ def main():
             message(str(exc))
             return
         dialog=tk.Toplevel(root)
+        round_window(dialog)
         dialog.title("Параметры таблицы")
         dialog.transient(root)
         dialog.columnconfigure(1,weight=1)
@@ -595,6 +598,7 @@ def main():
         if fields is None:
             return
         dialog=tk.Toplevel(root)
+        round_window(dialog)
         dialog.title("Шапка")
         dialog.transient(root)
         values=[]
@@ -611,7 +615,7 @@ def main():
         ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=6,pady=6)
         dialog.grab_set()
     if drag:
-        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas,input_view,field):
+        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas,input_view,input_content,text_surface,area,field):
             widget.drop_target_register(DND_FILES)
             def dropped(event):
                 paths=root.tk.splitlist(event.data)

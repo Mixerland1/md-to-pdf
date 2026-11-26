@@ -9,6 +9,7 @@ from tkinter import ttk, filedialog, messagebox, colorchooser
 import tkinter.font as tkfont
 from .profiles import Profile, granulex_profile, import_logo, load_profile, save_profile, library_dir, list_profiles
 from .cli import convert
+from .ui_skin import round_window
 
 COLORS = ("accent", "text", "heading", "table", "table_text", "link", "muted")
 NUMBERS = ("body_pt", "line_height", "margin_top", "margin_right", "margin_bottom", "margin_left", "logo_mm")
@@ -25,6 +26,7 @@ LABELS = {
 
 def edit_profile(parent, *, initial=None, existing=None, on_save):
     win = tk.Toplevel(parent)
+    round_window(win)
     win.title("Настройка стиля")
     win.transient(parent)
     win.geometry("720x620")
@@ -176,6 +178,7 @@ def builtin_profile(key, label):
 
 def manage_profiles(parent, *, selected, builtins, on_change):
     win = tk.Toplevel(parent)
+    round_window(win)
     win.title("Стили документов")
     win.transient(parent)
     win.geometry("620x440")

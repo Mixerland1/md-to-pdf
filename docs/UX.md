@@ -29,3 +29,5 @@ Beta 8: Version and Last updated are explicit fragment roles; branded presets as
 Beta 9: consistent three-choice save confirmation before discarding unsaved work. Save must complete successfully; cancelled save or error leaves the editor open. Clean documents require no confirmation.
 
 Beta 10: single-window large text import view; cancel returns to prior view. File drop and clipboard import share the window. Replace low-resolution WebP with scalable SVG reconstruction of approved artwork. No additional text-import dialog.
+
+Beta 11: 18px rounded welcome and import cards, 14px rounded text surface, thin border and subtle shadow. Native rounded window preference on supported Windows; system dialog decoration remains OS controlled.

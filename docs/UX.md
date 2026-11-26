@@ -35,3 +35,5 @@ Beta 11: 18px rounded welcome and import cards, 14px rounded text surface, thin 
 Beta 12: compact Office-style painter, list toggles and contextual table menu; preset management moved into the preset dropdown and embedded editor. Structural roles are displayed but assigned via their own icons.
 
 Beta 13: built-in Фантом preset, compact legacy cover conversion, local MDIS logo or packaged fallback, guide styles and dynamic linked TOC; approved brush SVG.
+
+Beta 14: centered welcome card, animated SVG tracks, Ctrl+wheel zoom, icon-only editor commands and return-to-welcome opening. Editable import of PDF/DOCX/Excel/CSV. Windows installer alongside portable distribution.

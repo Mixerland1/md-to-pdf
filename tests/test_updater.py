@@ -39,3 +39,11 @@ class UpdaterTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 unpack_windows(archive,root/"other")
             self.assertFalse((root/"escape").exists())
+
+    def test_installer_asset_selection(self):
+        from md_to_pdf.updater import WINDOWS_SETUP
+        r=release("v0.4.0b14",True)
+        self.assertIsNone(select_release([r],"0.4.0b13",WINDOWS_SETUP))
+        r["assets"].append(dict(name=WINDOWS_SETUP,state="uploaded",size=123,
+                                browser_download_url=DOWNLOAD+r["tag_name"]+"/"+WINDOWS_SETUP))
+        self.assertEqual(select_release([r],"0.4.0b13",WINDOWS_SETUP).asset,WINDOWS_SETUP)

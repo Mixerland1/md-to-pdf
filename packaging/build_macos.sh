@@ -18,7 +18,7 @@ python -m PyInstaller --noconfirm --clean --onedir --windowed --name MD-to-PDF \
     --osx-bundle-identifier org.md-to-pdf.desktop --target-architecture "$arch" \
     --runtime-hook packaging/macos_native_hook.py \
     --collect-all md_to_pdf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all weasyprint --collect-all tkinterdnd2 \
-    --collect-all mistune --collect-all mammoth --collect-all bleach \
+    --collect-all mistune --collect-all mammoth --collect-all bleach --collect-all openpyxl --collect-all xlrd \
     "$@" packaging/desktop.py
 app="$PWD/dist/MD-to-PDF.app"
 test -d "$app"

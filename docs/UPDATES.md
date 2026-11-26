@@ -9,3 +9,5 @@ macOS currently offers the matching single ZIP download only; automatic .app rep
 Acceptance: successful frozen package tests, isolated Windows helper swap test, source unit tests, and manual update from beta 1 to a subsequent build on real Windows hardware. Do not claim that the last acceptance has occurred until verified.
 
 Beta publication policy: a verified Windows archive may be published even if macOS builds fail. Only verified artifacts are included and missing platforms are identified in release notes; stable releases still require all three platforms. Beta 11 recovery uses the original successful Windows artifact and original source commit, not unverified Mac binaries.
+
+Beta 14: Windows Setup.exe installs under Program Files, creates shortcuts and uninstaller. Installed version selects the SHA-256 verified setup asset and starts the installer wizard with normal UAC; portable ZIP continues to use the existing replacement helper. Portable-to-installed migration requires running setup once.

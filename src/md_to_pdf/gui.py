@@ -207,9 +207,11 @@ def main():
     actions=ttk.Frame(welcome,style="Welcome.TFrame")
     actions.pack()
     drop=ttk.Button(actions,text="Открыть",command=choose,style="Accent.TButton")
+    tooltip(drop,"Выбрать файл")
     drop.pack(side="left",padx=(0,8))
     paste_button=ttk.Button(actions,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     paste_button.pack(side="left")
+    tooltip(paste_button,"Вставить текст из буфера (Ctrl+V)")
     back_button=iconify(ttk.Button(actions,text="Вернуться к документу",command=lambda:back_to_document(),style="Toolbar.TButton"),"back")
     empty.center_widget(welcome)
     empty.bind("<Button-1>",lambda e:empty.focus_set())
@@ -417,7 +419,7 @@ def main():
             open_button.pack(side="left")
         if not editor_paste.winfo_manager():
             editor_paste.pack(side="left",padx=(4,0))
-        editor_paste.configure(text="Изменить текст" if pasted else "Вставить текст")
+        editor_paste.configure(text="Вставить текст")
         export_button.pack(side="right")
         save_button.pack(side="right",padx=4)
         arrange_toolbar()
@@ -776,9 +778,11 @@ def main():
         if sys.platform!="win32":
             webbrowser.open(release.url)
             return
-        if not messagebox.askyesno("Обновление","Обновить программу и перезапустить?",parent=root):
+        from .updater import WINDOWS_SETUP
+        prompt="Запустить установщик обновления? Программа закроется; завершите установку в мастере." if release.asset==WINDOWS_SETUP else "Обновить программу и перезапустить?"
+        if not messagebox.askyesno("Обновление",prompt,parent=root):
             return
-        if not discard_ok():
+        if not confirm_input_discard() or not discard_ok():
             return
         state["updating"]=True
         message("Загрузка обновления…")

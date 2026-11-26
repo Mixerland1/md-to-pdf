@@ -11,7 +11,7 @@ $env:PATH = "$env:WEASYPRINT_DLL_DIRECTORIES;$env:PATH"
 & $Python -m unittest discover -s tests -v
 if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
 & ./packaging/check_update.ps1
-& $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name 'MD-to-PDF' --collect-all md_to_pdf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all weasyprint --collect-all tkinterdnd2 --collect-all mistune --collect-all mammoth --collect-all bleach --add-binary "$env:WEASYPRINT_DLL_DIRECTORIES\*.dll;native" packaging/desktop.py
+& $Python -m PyInstaller --noconfirm --clean --onedir --windowed --name 'MD-to-PDF' --collect-all md_to_pdf --collect-all pypdfium2 --collect-all pypdfium2_raw --collect-all weasyprint --collect-all tkinterdnd2 --collect-all mistune --collect-all mammoth --collect-all bleach --collect-all openpyxl --collect-all xlrd --add-binary "$env:WEASYPRINT_DLL_DIRECTORIES\*.dll;native" packaging/desktop.py
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 $root = 'dist/MD-to-PDF'
 Copy-Item LICENSE,README.md $root
@@ -40,3 +40,27 @@ if ($p.ExitCode -ne 0 -or !(Test-Path $brand)) { throw 'Frozen brand smoke test 
 & $Python packaging/check_smoke.py $out $brand
 if ($LASTEXITCODE -ne 0) { throw 'Frozen brand PDF validation failed' }
 Compress-Archive -Path $root -DestinationPath 'MD-to-PDF-Windows-x64.zip' -Force
+
+# Build the installer and check install/uninstall on the disposable runner.
+$ISCC = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Inno Setup 6\ISCC.exe'
+if (!(Test-Path $ISCC)) {
+    choco install innosetup --yes --no-progress
+    if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+}
+if (!(Test-Path $ISCC)) { throw 'Inno Setup compiler not found' }
+$version = (& $Python -c "from md_to_pdf import __version__; print(__version__)").Trim()
+& $ISCC "/DAppVersion=$version" packaging/setup.iss
+if ($LASTEXITCODE -ne 0 -or !(Test-Path 'MD-to-PDF-Windows-Setup.exe')) { throw 'Installer build failed' }
+$installed = Join-Path $env:RUNNER_TEMP 'md-to-pdf-install-smoke'
+$args = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /TASKS="" /DIR="' + $installed + '"'
+$setup = Start-Process -FilePath (Join-Path $PWD 'MD-to-PDF-Windows-Setup.exe') -ArgumentList $args -Wait -PassThru
+if ($setup.ExitCode -ne 0 -or !(Test-Path "$installed/MD-to-PDF.exe") -or !(Test-Path "$installed/unins000.exe")) { throw 'Installer smoke failed' }
+try {
+    $installedPdf = Join-Path $env:RUNNER_TEMP 'md-to-pdf-installed-smoke.pdf'
+    $args = '--smoke-test "' + (Join-Path $PWD 'examples/example.md') + '" "' + $installedPdf + '"'
+    $p = Start-Process -FilePath "$installed/MD-to-PDF.exe" -ArgumentList $args -Wait -PassThru
+    if ($p.ExitCode -ne 0 -or !(Test-Path $installedPdf)) { throw 'Installed EXE smoke failed' }
+} finally {
+    $u = Start-Process -FilePath "$installed/unins000.exe" -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+    if ($u.ExitCode -ne 0) { throw 'Uninstall smoke failed' }
+}

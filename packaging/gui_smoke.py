@@ -15,7 +15,7 @@ def descendants(widget):
         yield from descendants(child)
 
 def buttons(widget):
-    return {str(w.cget("text")):w for w in descendants(widget) if isinstance(w,ttk.Button)}
+    return {str(w.cget("text")):w for w in descendants(widget) if isinstance(w,ttk.Button) and w.winfo_ismapped()}
 
 root=tk.Tk()
 try:
@@ -29,6 +29,12 @@ try:
             assert any(isinstance(w,Backdrop) and w.original is not None for w in descendants(root))
             assert "Вставить текст" in buttons(root)
             assert any(isinstance(w,Backdrop) and w.card_photo is not None for w in descendants(root))
+            home=next(w for w in descendants(root) if isinstance(w,Backdrop) and not w.banner)
+            deadline=time.monotonic()+2
+            while home.coords(home.center)!=[home.winfo_width()/2,home.winfo_height()/2] and time.monotonic()<deadline:
+                root.update();time.sleep(.05)
+            assert home.coords(home.center)==[home.winfo_width()/2,home.winfo_height()/2]
+            assert len(home.motion_tracks)==4
             buttons(root)["Открыть"].invoke()
             deadline=time.monotonic()+30
             preview=next(w for w in descendants(root) if isinstance(w,PagePreview))
@@ -37,6 +43,11 @@ try:
                 time.sleep(.05)
             assert preview.doc is not None,"Actual PDF preview did not render"
             assert len(preview.mapping)>0,"PDF selection mapping empty"
+            old=preview.scale
+            preview._zoom_wheel(SimpleNamespace(delta=120,x=400,y=200))
+            assert preview.scale>old
+            preview._zoom_wheel(SimpleNamespace(delta=-120,x=400,y=200))
+            assert abs(preview.scale-old)<.001
             controls=[w for w in descendants(root) if isinstance(w,ttk.Combobox)]
             role=next(w for w in controls if "Заголовок 2" in w.cget("values"))
             idx=next(i for i,(block,offset) in preview.mapping.items() if block==1)
@@ -72,6 +83,12 @@ try:
             assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
             buttons(root)["Экспорт PDF"].invoke()
             assert source.with_suffix(".pdf").is_file()
+            buttons(root)["Открыть"].invoke()
+            root.update()
+            assert home.winfo_ismapped() and not preview.winfo_ismapped()
+            buttons(root)["Вернуться к документу"].invoke()
+            root.update()
+            assert preview.winfo_ismapped()
             assert "⚙" not in buttons(root)
             preset=next(w for w in controls if "Настроить пресет…" in w.cget("values"))
             preset.set("Настроить пресет…")

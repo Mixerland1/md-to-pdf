@@ -27,6 +27,7 @@ MAX_UNPACKED = 800 * 1024 * 1024
 TAG = re.compile(r"v[0-9][0-9A-Za-z.+-]{0,39}\Z")
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 WINDOWS = "MD-to-PDF-Windows-x64.zip"
+WINDOWS_SETUP = "MD-to-PDF-Windows-Setup.exe"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,8 @@ class Release:
 def platform_asset():
     arch = platform.machine().lower()
     if sys.platform == "win32" and arch in ("amd64", "x86_64"):
+        if getattr(sys,"frozen",False) and (Path(sys.executable).resolve().parent/"unins000.exe").is_file():
+            return WINDOWS_SETUP
         return WINDOWS
     if sys.platform == "darwin" and arch in ("arm64", "x86_64"):
         return "MD-to-PDF-macOS-" + arch + ".zip"
@@ -178,12 +181,23 @@ def unpack_windows(archive, destination):
 
 
 def prepare_windows(release):
-    if release.asset != WINDOWS or not getattr(sys, "frozen", False) or sys.platform != "win32":
+    if release.asset not in (WINDOWS,WINDOWS_SETUP) or not getattr(sys, "frozen", False) or sys.platform != "win32":
         raise ValueError("Автоматическая замена поддерживается только в Windows-сборке")
     executable = Path(sys.executable).resolve()
     install = executable.parent
     if executable.name.lower() != "md-to-pdf.exe" or not (install / "_internal").is_dir():
         raise ValueError("Не удалось определить папку приложения")
+    if release.asset==WINDOWS_SETUP:
+        if not (install/"unins000.exe").is_file():
+            raise ValueError("Установленная версия не найдена")
+        stage=Path(tempfile.mkdtemp(prefix="md-to-pdf-setup-"))
+        try:
+            setup=download(release,stage)
+            os.startfile(str(setup),"open",subprocess.list2cmdline(["/DIR="+str(install)]))
+        except Exception:
+            shutil.rmtree(stage,ignore_errors=True)
+            raise
+        return stage
     stage = Path(tempfile.mkdtemp(prefix=".md-to-pdf-update-", dir=install.parent))
     try:
         archive = download(release, stage)

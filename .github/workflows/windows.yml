@@ -29,7 +29,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: MD-to-PDF-Windows-x64
-          path: MD-to-PDF-Windows-x64.zip
+          path: |
+            MD-to-PDF-Windows-x64.zip
+            MD-to-PDF-Windows-Setup.exe
           if-no-files-found: error
   macos:
     strategy:
@@ -92,9 +94,13 @@ jobs:
               printf '\n%s was not published: platform build or verification failed.\n' "$file" >> /tmp/md-to-pdf-release-notes.md
             fi
           done
-          sha256sum MD-to-PDF-*.zip > SHA256SUMS.txt
+          bundles=(MD-to-PDF-*.zip)
+          if [[ -s MD-to-PDF-Windows-Setup.exe ]]; then
+            bundles+=(MD-to-PDF-Windows-Setup.exe)
+          fi
+          sha256sum "${bundles[@]}" > SHA256SUMS.txt
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release already exists; bump version for new binaries."
           else
-            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file /tmp/md-to-pdf-release-notes.md "${flags[@]}"
+            gh release create "$tag" "${bundles[@]}" SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file /tmp/md-to-pdf-release-notes.md "${flags[@]}"
           fi

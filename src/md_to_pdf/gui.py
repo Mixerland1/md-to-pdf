@@ -89,14 +89,14 @@ def main():
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
     state={"workspace":None,"result":None,"generation":0,"rendering":False,
-           "dirty":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
+           "dirty":False,"importing":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
     profiles=list_profiles()
     preset=tk.StringVar(value="Технический")
     role=tk.StringVar(value="Стиль фрагмента")
     font=tk.StringVar(value="Шрифт")
     size=tk.StringVar(value="pt")
     chrome=ttk.Frame(root,style="Toolbar.TFrame")
-    banner=Backdrop(chrome,"toolbar.webp",banner=True,height=23)
+    banner=Backdrop(chrome,"toolbar.svg",banner=True,height=23)
     banner.pack(fill="x")
     bar=ttk.Frame(chrome,padding=(10,6),style="Toolbar.TFrame")
     bar.pack(fill="x")
@@ -171,7 +171,7 @@ def main():
     ttk.Button(editor_bar,text="↷",width=3,style="Toolbar.TButton",command=lambda:history(True)).pack(side="left",padx=(2,0))
     export_button=ttk.Button(right_tools,text="Экспорт PDF",command=lambda:export(),style="Accent.TButton")
     update_button=ttk.Button(right_tools,text="Обновить",command=lambda:update_action(),style="Toolbar.TButton")
-    empty=Backdrop(root,"welcome.webp")
+    empty=Backdrop(root,"welcome.svg")
     empty.grid(row=1,sticky="nsew")
     welcome=ttk.Frame(empty,padding=(26,22),style="Welcome.TFrame")
     ttk.Label(welcome,text="MD to PDF",font=("TkDefaultFont",24,"bold"),style="Welcome.TLabel").pack()
@@ -184,6 +184,7 @@ def main():
     paste_button=ttk.Button(actions,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     paste_button.pack(side="left")
     empty.center_widget(welcome)
+    empty.bind("<Button-1>",lambda e:empty.focus_set())
     preview=PagePreview(root,lambda ranges:select(ranges),lambda e:context(e))
     status=tk.StringVar(value="")
     status_label=ttk.Label(root,textvariable=status,padding=(10,3))
@@ -194,7 +195,7 @@ def main():
         else:
             status_label.grid_remove()
     def load(name):
-        if state["updating"] or not discard_ok():
+        if state["updating"] or not confirm_input_discard() or not discard_ok():
             return
         try:
             path=Path(name).resolve()
@@ -215,69 +216,101 @@ def main():
             return
         show_workspace(ws,pasted=False)
 
-    def paste(_=None, fresh=False):
-        if state["updating"]:
+    # Importing text is a view in the same window, never a Toplevel.
+    input_view=ttk.Frame(root,style="Welcome.TFrame",padding=(28,22))
+    input_view.columnconfigure(0,weight=1)
+    input_view.rowconfigure(1,weight=1)
+    top=ttk.Frame(input_view,style="Welcome.TFrame")
+    top.grid(row=0,sticky="ew",pady=(0,12))
+    ttk.Label(top,text="Текст документа",font=("TkDefaultFont",16,"bold"),style="Welcome.TLabel").pack(side="left")
+    ttk.Button(top,text="Открыть файл…",style="Toolbar.TButton",command=choose).pack(side="right")
+    area=ttk.Frame(input_view)
+    area.grid(row=1,sticky="nsew")
+    area.columnconfigure(0,weight=1)
+    area.rowconfigure(0,weight=1)
+    field=tk.Text(area,wrap="word",undo=True,exportselection=False,padx=16,pady=16,
+                  font=("TkDefaultFont",12),foreground=INK,background="#ffffff",
+                  relief="flat",highlightthickness=1,highlightbackground="#bac9df",
+                  highlightcolor="#355d91",insertbackground=INK)
+    field.grid(row=0,column=0,sticky="nsew")
+    scroll=ttk.Scrollbar(area,orient="vertical",command=field.yview)
+    scroll.grid(row=0,column=1,sticky="ns")
+    field.configure(yscrollcommand=scroll.set)
+    input_actions=ttk.Frame(input_view,style="Welcome.TFrame")
+    input_actions.grid(row=2,sticky="ew",pady=(12,0))
+    def clipboard():
+        try:
+            return root.clipboard_get()
+        except tk.TclError:
+            return ""
+    def input_value():
+        return field.get("1.0","end-1c")
+    def confirm_input_discard():
+        if not state["importing"] or not input_value().strip():
+            return True
+        return messagebox.askyesno("MD to PDF","Заменить введённый текст?",parent=root)
+    def refill():
+        value=clipboard()
+        if value:
+            field.delete("1.0","end")
+            field.insert("1.0",value)
+        field.focus_set()
+    def cancel_input():
+        state["importing"]=False
+        input_view.grid_remove()
+        if state["workspace"] is not None:
+            chrome.grid(row=0,sticky="ew")
+            preview.grid(row=1,sticky="nsew")
+        else:
+            empty.grid(row=1,sticky="nsew")
+            if state["update"]:
+                chrome.grid(row=0,sticky="ew")
+        message()
+    def accept_input():
+        if state["updating"] or not state["importing"]:
+            return
+        value=input_value()
+        if not value.strip():
+            message("Введите или вставьте текст.")
+            field.focus_set()
             return
         previous=state["workspace"]
-        current_text=None
-        if state["pasted"] and previous:
-            current_text=previous.source.read_text(encoding="utf-8")
-        def clipboard():
-            try:
-                return root.clipboard_get()
-            except tk.TclError:
-                return ""
-        initial=current_text if current_text is not None and not fresh else clipboard()
-        dialog=tk.Toplevel(root)
-        dialog.title("Вставить текст")
-        dialog.transient(root)
-        dialog.geometry("700x460")
-        dialog.minsize(400,260)
-        dialog.columnconfigure(0,weight=1)
-        dialog.rowconfigure(0,weight=1)
-        area=ttk.Frame(dialog,padding=10)
-        area.grid(row=0,sticky="nsew")
-        area.columnconfigure(0,weight=1)
-        area.rowconfigure(0,weight=1)
-        field=tk.Text(area,wrap="word",undo=True,exportselection=False,padx=10,pady=10)
-        field.grid(row=0,column=0,sticky="nsew")
-        scroll=ttk.Scrollbar(area,orient="vertical",command=field.yview)
-        scroll.grid(row=0,column=1,sticky="ns")
-        field.configure(yscrollcommand=scroll.set)
+        if state["pasted"] and previous and value==previous.source.read_text(encoding="utf-8"):
+            cancel_input()
+            return
+        try:
+            ws=Workspace.from_clipboard(value,clipboard_dir.name,**options())
+        except Exception as exc:
+            message(str(exc))
+            return
+        if previous and not discard_ok():
+            return
+        show_workspace(ws,pasted=True)
+    ttk.Button(input_actions,text="Из буфера",command=refill,style="Toolbar.TButton").pack(side="left")
+    ttk.Button(input_actions,text="Очистить",command=lambda:field.delete("1.0","end"),style="Toolbar.TButton").pack(side="left",padx=6)
+    ttk.Button(input_actions,text="Открыть в редакторе",style="Accent.TButton",command=accept_input).pack(side="right")
+    ttk.Button(input_actions,text="Отмена",command=cancel_input,style="Toolbar.TButton").pack(side="right",padx=6)
+    def paste(_=None,fresh=False):
+        if state["updating"]:
+            return
+        if state["importing"]:
+            field.focus_set()
+            return
+        previous=state["workspace"]
+        initial=previous.source.read_text(encoding="utf-8") if state["pasted"] and previous and not fresh else clipboard()
+        field.delete("1.0","end")
         field.insert("1.0",initial)
         field.edit_reset()
-        actions=ttk.Frame(dialog,padding=(10,0,10,10))
-        actions.grid(row=1,sticky="ew")
-        def refill():
-            value=clipboard()
-            if value:
-                field.delete("1.0","end")
-                field.insert("1.0",value)
-            field.focus_set()
-        ttk.Button(actions,text="Из буфера",command=refill).pack(side="left")
-        ttk.Button(actions,text="Очистить",command=lambda:field.delete("1.0","end")).pack(side="left",padx=5)
-        def accept():
-            value=field.get("1.0","end-1c")
-            if not value.strip():
-                messagebox.showinfo("Вставить текст","Введите или вставьте текст.",parent=dialog)
-                return
-            if current_text is not None and value==current_text:
-                dialog.destroy()
-                return
-            if previous and not discard_ok(dialog):
-                return
-            try:
-                ws=Workspace.from_clipboard(value,clipboard_dir.name,**options())
-            except Exception as exc:
-                messagebox.showerror("Вставить текст",str(exc),parent=dialog)
-                return
-            dialog.destroy()
-            show_workspace(ws,pasted=True)
-        ttk.Button(actions,text="Отмена",command=dialog.destroy).pack(side="right")
-        ttk.Button(actions,text="Открыть в редакторе",style="Accent.TButton",command=accept).pack(side="right",padx=5)
-        dialog.bind("<Escape>",lambda e:dialog.destroy())
-        dialog.grab_set()
+        state["importing"]=True
+        cancel_brush()
+        empty.grid_remove()
+        preview.grid_remove()
+        chrome.grid_remove()
+        input_view.grid(row=1,sticky="nsew")
+        message()
         field.focus_set()
+    field.bind("<Control-Return>",lambda e:(accept_input(),"break")[1])
+    field.bind("<Escape>",lambda e:(cancel_input(),"break")[1])
 
     def paste_shortcut(event):
         # Native paste inside font/size/header entry fields must keep working.
@@ -300,10 +333,11 @@ def main():
     bar.bind("<Configure>",arrange_toolbar)
 
     def show_workspace(ws,pasted):
-        state.update(workspace=ws,dirty=pasted,pasted=pasted,paste_pdf=None,result=None,
+        state.update(workspace=ws,dirty=pasted,importing=False,pasted=pasted,paste_pdf=None,result=None,
                      selection=[],brush=None,restore_selection=[])
         cancel_brush()
         update_fields()
+        input_view.grid_remove()
         empty.grid_remove()
         chrome.grid(row=0,sticky="ew")
         if not open_button.winfo_manager():
@@ -577,7 +611,7 @@ def main():
         ttk.Button(dialog,text="Применить",command=save).grid(row=3,column=1,sticky="e",padx=6,pady=6)
         dialog.grab_set()
     if drag:
-        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas):
+        for widget in (root,empty,welcome,drop,paste_button,editor_paste,preview.canvas,input_view,field):
             widget.drop_target_register(DND_FILES)
             def dropped(event):
                 paths=root.tk.splitlist(event.data)
@@ -641,7 +675,8 @@ def main():
                 elif kind=="update" and value:
                     state["update"]=value
                     update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
-                    chrome.grid(row=0,sticky="ew")
+                    if not state["importing"]:
+                        chrome.grid(row=0,sticky="ew")
                     update_button.pack(side="right",padx=6)
                     arrange_toolbar()
                 elif kind=="update-exit":
@@ -657,19 +692,21 @@ def main():
     def close():
         if state["updating"]:
             return
+        if state["importing"] and not confirm_input_discard():
+            return
         if not discard_ok():
             return
         preview.close()
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
-    root.bind("<Escape>",cancel_brush)
+    root.bind("<Escape>",lambda e:cancel_input() if state["importing"] else cancel_brush())
     root.bind("<Control-o>",lambda e:choose())
     root.bind("<Control-v>",paste_shortcut)
     if sys.platform=="darwin":
         root.bind("<Command-v>",paste_shortcut)
-    root.bind("<Control-s>",lambda e:save())
-    root.bind("<Control-z>",lambda e:history(False))
-    root.bind("<Control-y>",lambda e:history(True))
+    root.bind("<Control-s>",lambda e:None if state["importing"] else save())
+    root.bind("<Control-z>",lambda e:None if state["importing"] else history(False))
+    root.bind("<Control-y>",lambda e:None if state["importing"] else history(True))
     root.after(80,poll)
     try:
         root.mainloop()

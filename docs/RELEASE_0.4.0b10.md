@@ -1,0 +1,5 @@
+# 0.4.0 beta 10 — inline text import and scalable artwork
+
+Paste text opens a large editable view inside the main window rather than a modal text window. Open, drop or paste text, edit/refill/clear it, then open it in the PDF editor. Cancel returns to the preceding view. The existing document remains unchanged until the replacement is accepted. The previous document's save confirmation still applies. File drops work on the text import view too.
+
+The low-resolution compressed WebP artwork has been replaced with a vector reconstruction of the approved blue/white/red composition. SVG artwork is rendered locally at 1920-pixel width and rerendered at higher resolutions if needed, without lossy image compression. This is a reconstruction, not the exact original raster. Manual visual verification on Windows/macOS remains pending.

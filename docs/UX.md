@@ -27,3 +27,5 @@ Beta 7: format-by-sample mode clears after application; toolbar adapts to width 
 Beta 8: Version and Last updated are explicit fragment roles; branded presets assign complete paragraphs to empty right header fields. Existing table cells expose Cell and Table heading roles; contextual Table parameters provides width, position, and borders. No permanent extra toolbar button.
 
 Beta 9: consistent three-choice save confirmation before discarding unsaved work. Save must complete successfully; cancelled save or error leaves the editor open. Clean documents require no confirmation.
+
+Beta 10: single-window large text import view; cancel returns to prior view. File drop and clipboard import share the window. Replace low-resolution WebP with scalable SVG reconstruction of approved artwork. No additional text-import dialog.

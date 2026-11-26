@@ -76,18 +76,21 @@ try:
             root.clipboard_clear()
             root.clipboard_append("# Из буфера\n\nНовый текст.")
             buttons(root)["Вставить текст"].invoke()
-            dialog=next(w for w in root.winfo_children() if isinstance(w,tk.Toplevel))
-            field=next(w for w in descendants(dialog) if isinstance(w,tk.Text))
+            root.update()
+            assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
+            field=next(w for w in descendants(root) if isinstance(w,tk.Text) and w.winfo_ismapped())
+            assert field.winfo_height()>250
             assert "Новый текст" in field.get("1.0","end")
             field.delete("1.0","end")
             field.insert("1.0","# Из буфера\n\nИсправленный текст.")
-            with patch.object(gui.messagebox,"askyesno",return_value=True):
-                buttons(dialog)["Открыть в редакторе"].invoke()
+            buttons(root)["Открыть в редакторе"].invoke()
             deadline=time.monotonic()+30
             while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
                 root.update()
                 time.sleep(.05)
             assert any("Исправленный" in t for t in ["".join(g.char for g in preview.glyphs)]),"Pasted text missing"
+            assert not field.winfo_ismapped()
+            assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
             with patch.object(gui.filedialog,"asksaveasfilename",return_value=str(Path(d)/"clipboard.pdf")):
                 buttons(root)["Экспорт PDF"].invoke()
             assert (Path(d)/"clipboard.pdf").is_file()

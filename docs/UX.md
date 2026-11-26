@@ -31,3 +31,5 @@ Beta 9: consistent three-choice save confirmation before discarding unsaved work
 Beta 10: single-window large text import view; cancel returns to prior view. File drop and clipboard import share the window. Replace low-resolution WebP with scalable SVG reconstruction of approved artwork. No additional text-import dialog.
 
 Beta 11: 18px rounded welcome and import cards, 14px rounded text surface, thin border and subtle shadow. Native rounded window preference on supported Windows; system dialog decoration remains OS controlled.
+
+Beta 12: compact Office-style painter, list toggles and contextual table menu; preset management moved into the preset dropdown and embedded editor. Structural roles are displayed but assigned via their own icons.

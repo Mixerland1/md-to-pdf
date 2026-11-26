@@ -125,3 +125,20 @@ class WorkspaceTests(unittest.TestCase):
             self.assertEqual(reopened.model.header_fields()[1:],w.model.header_fields()[1:])
             self.assertEqual(reopened.model.table_settings([(1,0,4)]),settings)
             self.assertEqual(reopened.skipped,0)
+
+    def test_table_row_roles_and_preview_mapping(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)/"table.md"
+            p.write_text("# Title\n\n| Parameter | Value |\n| --- | --- |\n| A very long label that wraps in a narrow column | Example text |\n| Last | End |\n",encoding="utf-8")
+            w=Workspace(p,template="granulex")
+            data,ids,texts,locations=render_snapshot(w.snapshot())
+            with pdfium.PdfDocument(data) as doc:
+                _,mapping=map_glyphs(doc,ids,texts,locations)
+                self.assertTrue(any(i==3 for i,_ in mapping.values()))
+            w.apply("table-row-heading",[(3,0,4)])
+            self.assertEqual(w.model.selection_role([(3,0,4),(4,0,4)]),"table-heading")
+            w.apply("table-cell",[(3,0,4)])
+            self.assertEqual(w.model.selection_role([(3,0,4)]),"table-cell")
+            self.assertEqual(w.model.selection_role([(4,0,4)]),"table-heading")
+            w.undo()
+            self.assertEqual(w.model.selection_role([(3,0,4)]),"table-heading")

@@ -87,13 +87,23 @@ def map_glyphs(document, anchors, texts, locations):
                    for p,(l,t,rr,bb) in locations[anchor]):
                 candidates.append(start)
             start = flat.find(needle,start+1)
-        # Do not guess when a source block cannot be uniquely matched.
-        if len(candidates)!=1:
+        # Table cell text can be interleaved with neighboring cells in PDF
+        # extraction order. Fall back to exact text within the anchor box.
+        if len(candidates)==1:
+            indices=list(range(candidates[0],candidates[0]+len(needle)))
+        else:
+            inside=[]
+            for j,g in enumerate(glyphs):
+                x,y,r,b=g.box
+                if any(g.page==pg and l-1<=(x+r)/2<=rr+1 and t-1<=(y+b)/2<=bb+1
+                       for pg,(l,t,rr,bb) in locations[anchor]):
+                    inside.append(j)
+            if "".join(glyphs[j].char for j in inside)!=needle:
+                continue
+            indices=inside
+        if any(j in mapped for j in indices):
             continue
-        start = candidates[0]
-        if any(j in mapped for j in range(start,start+len(needle))):
-            continue
-        for j,(_,offset) in enumerate(expected,start):
+        for j,(_,offset) in zip(indices,expected):
             mapped[j] = (block,offset)
     return glyphs,mapped
 

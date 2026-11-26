@@ -60,8 +60,7 @@ try:
             event=SimpleNamespace(x=(l+r)/2-preview.canvas.canvasx(0),y=(t+b)/2-preview.canvas.canvasy(0))
             preview._press(event);preview._release(event)
             assert role.get()=="Маркированный список",role.get()
-            role.set("Текст")
-            role.event_generate("<<ComboboxSelected>>")
+            buttons(root)["Маркированный список"].invoke()
             root.update()
             deadline=time.monotonic()+30
             while str(buttons(root)["Экспорт PDF"].cget("state"))=="disabled" and time.monotonic()<deadline:
@@ -73,6 +72,15 @@ try:
             assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
             buttons(root)["Экспорт PDF"].invoke()
             assert source.with_suffix(".pdf").is_file()
+            assert "⚙" not in buttons(root)
+            preset=next(w for w in controls if "Настроить пресет…" in w.cget("values"))
+            preset.set("Настроить пресет…")
+            preset.event_generate("<<ComboboxSelected>>")
+            root.update()
+            assert any(isinstance(w,ttk.Notebook) and w.winfo_ismapped() for w in descendants(root))
+            assert not any(isinstance(w,tk.Toplevel) for w in root.winfo_children())
+            buttons(root)["Отмена"].invoke()
+            root.update()
             assert len(preview.page_boxes)>0
             root.clipboard_clear()
             root.clipboard_append("# Из буфера\n\nНовый текст.")

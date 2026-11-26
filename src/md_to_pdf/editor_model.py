@@ -18,7 +18,7 @@ BLOCK_STYLES = {"normal": ("p", ""), "h1": ("h1", ""), "h2": ("h2", ""),
                 "h4": ("h4", ""), "h5": ("h5", ""), "h6": ("h6", "")}
 METADATA_STYLES = {"meta-version": (1,"Версия"), "meta-updated": (2,"Последнее обновление:")}
 BLOCK_STYLES.update({"meta-version":("p","editor-meta-version"),"meta-updated":("p","editor-meta-updated")})
-TABLE_STYLES = {"table-cell":"td","table-heading":"th"}
+TABLE_STYLES = {"table-cell":"td","table-heading":"th","table-row-cell":"td","table-row-heading":"th"}
 BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "blockquote",
               "li", "td", "th", "div"}
 EDITOR_CLASSES = {"editor-note", "editor-warning", "editor-meta-version", "editor-meta-updated"}
@@ -30,6 +30,10 @@ EDITOR_CSS = """
 .editor-meta-updated { font-weight:400; }
 table.editor-grid td, table.editor-grid th { border:1px solid #aab4c0; }
 table.editor-no-grid td, table.editor-no-grid th { border:0; }
+[data-editor-cell-role="th"] { font-weight:700; }
+[data-editor-cell-role="td"] { font-weight:400; background:transparent; color:inherit; }
+[data-editor-cell-role="td"] > p { font-weight:inherit; color:inherit; }
+[data-editor-cell-role="th"] > p { font-weight:inherit; color:inherit; }
 :where(.brand-accent) { color: #b50e25; }
 """
 
@@ -491,8 +495,13 @@ class DocumentEditor:
             if any(c is None for c in cells):
                 raise ValueError("Этот стиль применяется к существующей ячейке таблицы.")
             self._checkpoint()
+            if style.startswith("table-row-"):
+                cells=[c for row in {cell.getparent() for cell in cells} for c in row if c.tag in ("th","td")]
             for cell in set(cells):
                 cell.tag=TABLE_STYLES[style]
+                # Explicit visual role, including cells imported from DOCX
+                # with inherited paragraph formatting.
+                cell.set("data-editor-cell-role",cell.tag)
             return list(ranges)
         if style.startswith("table-settings:"):
             table=self._table(ranges)

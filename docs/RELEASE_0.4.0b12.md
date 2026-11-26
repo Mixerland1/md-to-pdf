@@ -1,0 +1,5 @@
+# 0.4.0 beta 12 — compact formatting tools
+
+Antialiased Office-style format painter (original drawing), bullet and numbering toggles, and contextual table icon. The style selector reports structural roles but does not list them as ordinary paragraph styles. Table menu supports cell and row heading/normal roles plus existing table settings. Exact glyph matching inside anchor bounds is a fallback for interleaved PDF text; ambiguous text remains protected. Existing table creation is not implemented.
+
+Gear removed. Preset selector contains Configure, Create and Import actions. Full preset editor is embedded in the main window; saved profiles apply to the current document, while direct font/size changes affect only selection. Existing JSON export retained; separate sample PDF preview omitted in embedded editor in favor of the real document preview. Manual Windows/Mac verification pending.

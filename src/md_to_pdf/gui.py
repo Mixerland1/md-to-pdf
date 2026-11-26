@@ -13,19 +13,22 @@ import tkinter.font as tkfont
 from tkinter import ttk,filedialog,messagebox
 from . import __version__
 from .inputs import EXTENSIONS
-from .profiles import load_profile,list_profiles
-from .profile_editor import manage_profiles
+from .profiles import Profile,load_profile,list_profiles
+from dataclasses import replace
+from .profile_editor import edit_profile,builtin_profile
 from .workspace import Workspace,render_snapshot,export_bytes,write_pdf_bytes
-from .ui_skin import Backdrop,RoundedPanel,round_window,configure_theme,SURFACE,INK
+from .ui_skin import Backdrop,RoundedPanel,round_window,configure_theme,toolbar_icon,SURFACE,INK
 from .page_preview import PagePreview
 
 BUILTINS={"Технический":"technical","Деловой":"business","Учебный":"academic","Granulex":"granulex"}
 STYLES={"Текст":"normal","Заголовок 1":"h1","Заголовок 2":"h2","Заголовок 3":"h3",
-        "Маркированный список":"bullet","Нумерованный список":"numbered","Заголовок 4":"h4","Заголовок 5":"h5","Заголовок 6":"h6",
+        "Заголовок 4":"h4","Заголовок 5":"h5","Заголовок 6":"h6",
         "Цитата":"quote","Примечание":"note","Предупреждение":"warning","Блок кода":"code-block",
         "Версия":"meta-version","Последнее обновление":"meta-updated",
-        "Ячейка таблицы":"table-cell","Заголовок таблицы":"table-heading",
         "Полужирный":"bold","Курсив":"italic","Код":"code","Акцент":"accent"}
+
+STRUCTURE_STYLES={"Маркированный список":"bullet","Нумерованный список":"numbered","Ячейка таблицы":"table-cell","Заголовок таблицы":"table-heading"}
+PRESET_ACTIONS=("Настроить пресет…","Создать пресет…","Импорт пресета…")
 
 def ask_save_changes(parent):
     """Return save, discard or cancel; Escape and the window close mean cancel."""
@@ -90,7 +93,7 @@ def main():
     root.rowconfigure(1,weight=1)
     events=queue.Queue()
     state={"workspace":None,"result":None,"generation":0,"rendering":False,
-           "dirty":False,"importing":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
+           "dirty":False,"importing":False,"configuring":False,"pasted":False,"paste_pdf":None,"selection":[],"brush":None,"restore_selection":[],"update":None,"updating":False}
     profiles=list_profiles()
     preset=tk.StringVar(value="Технический")
     role=tk.StringVar(value="Стиль фрагмента")
@@ -121,18 +124,18 @@ def main():
             load(name)
     open_button=ttk.Button(left_tools,text="Открыть",command=choose,style="Toolbar.TButton")
     editor_bar=ttk.Frame(bar,style="Toolbar.TFrame")
-    combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles),state="readonly",width=17,style="Toolbar.TCombobox")
+    combo=ttk.Combobox(editor_bar,textvariable=preset,values=(*BUILTINS,*profiles,*PRESET_ACTIONS),state="readonly",width=17,style="Toolbar.TCombobox")
     combo.pack(side="left",padx=(8,2))
     def refresh_profiles(path=None):
         nonlocal profiles
         profiles=list_profiles()
-        combo.configure(values=(*BUILTINS,*profiles))
+        combo.configure(values=(*BUILTINS,*profiles,*PRESET_ACTIONS))
         if path:
             label=next((k for k,v in profiles.items() if v==path),None)
             if label:
                 preset.set(label)
                 switch()
-    ttk.Button(editor_bar,text="⚙",width=3,style="Toolbar.TButton",command=lambda:manage_profiles(root,selected=preset.get(),builtins=BUILTINS,on_change=refresh_profiles)).pack(side="left",padx=(0,6))
+
     styles=ttk.Combobox(editor_bar,textvariable=role,values=tuple(STYLES),state="readonly",width=19,style="Toolbar.TCombobox")
     styles.pack(side="left",padx=(0,4))
     fonts=sorted(set(tkfont.families(root))|{"Montserrat","Roboto Mono","Arial","Times New Roman","DejaVu Sans"},key=str.casefold)
@@ -140,10 +143,7 @@ def main():
     font_box.pack(side="left",padx=(0,3))
     size_box=ttk.Combobox(editor_bar,textvariable=size,values=("6","7","8","9","10","11","12","14","16","18","20","24","28","32","36","48","72"),width=5,style="Toolbar.TCombobox")
     size_box.pack(side="left",padx=(0,3))
-    brush_icon=tk.PhotoImage(master=root,width=20,height=20)
-    # Small original pixel icon: a diagonally oriented paintbrush.
-    for y,x0,x1,color in ((2,13,16,"#314e71"),(3,12,17,"#314e71"),(4,11,17,"#314e71"),(5,10,16,"#314e71"),(6,9,15,"#314e71"),(7,8,14,"#314e71"),(8,7,13,"#314e71"),(9,6,12,"#e3a64b"),(10,5,11,"#e3a64b"),(11,4,10,"#e3a64b"),(12,3,9,"#e3a64b"),(13,3,8,"#e3a64b"),(14,2,7,"#bd7b35"),(15,2,6,"#bd7b35"),(16,1,4,"#314e71")):
-        brush_icon.put(color,to=(x0,y,x1+1,y+1))
+    brush_icon=toolbar_icon(root,"format")
     brush_button=ttk.Button(editor_bar,image=brush_icon,text="Формат по образцу",style="Toolbar.TButton",command=lambda:brush())
     brush_button.image=brush_icon
     def tooltip(widget,label):
@@ -165,6 +165,16 @@ def main():
         widget.bind("<ButtonPress>",hide,add="+")
     tooltip(brush_button,"Формат по образцу")
     brush_button.pack(side="left",padx=(0,4))
+    def structure_button(name,label,command):
+        icon=toolbar_icon(root,name)
+        widget=ttk.Button(editor_bar,image=icon,text=label,style="Toolbar.TButton",command=command)
+        widget.image=icon
+        widget.pack(side="left",padx=1)
+        tooltip(widget,label)
+        return widget
+    bullet_button=structure_button("bullet","Маркированный список",lambda:toggle_list("bullet"))
+    numbered_button=structure_button("numbered","Нумерованный список",lambda:toggle_list("numbered"))
+    table_button=structure_button("table","Таблица",lambda:table_menu())
     editor_paste=ttk.Button(left_tools,text="Вставить текст",command=lambda:paste(),style="Toolbar.TButton")
     save_button=ttk.Button(right_tools,text="Сохранить",command=lambda:save(),style="Toolbar.TButton")
 
@@ -196,7 +206,7 @@ def main():
         else:
             status_label.grid_remove()
     def load(name):
-        if state["updating"] or not confirm_input_discard() or not discard_ok():
+        if state["updating"] or state["configuring"] or not confirm_input_discard() or not discard_ok():
             return
         try:
             path=Path(name).resolve()
@@ -207,7 +217,7 @@ def main():
                 saved=ws.restore()
                 if saved:
                     if saved not in (*BUILTINS,*profiles):
-                        combo.configure(values=(*BUILTINS,*profiles,saved))
+                        combo.configure(values=(*BUILTINS,*profiles,saved,*PRESET_ACTIONS))
                     preset.set(saved)
             except Exception as exc:
                 messagebox.showwarning("Сохранённые правки",str(exc),parent=root)
@@ -293,7 +303,7 @@ def main():
     ttk.Button(input_actions,text="Открыть в редакторе",style="Accent.TButton",command=accept_input).pack(side="right")
     ttk.Button(input_actions,text="Отмена",command=cancel_input,style="Toolbar.TButton").pack(side="right",padx=6)
     def paste(_=None,fresh=False):
-        if state["updating"]:
+        if state["updating"] or state["configuring"]:
             return
         if state["importing"]:
             field.focus_set()
@@ -335,6 +345,8 @@ def main():
     bar.bind("<Configure>",arrange_toolbar)
 
     def show_workspace(ws,pasted):
+        nonlocal active_label
+        active_label=preset.get()
         state.update(workspace=ws,dirty=pasted,importing=False,pasted=pasted,paste_pdf=None,result=None,
                      selection=[],brush=None,restore_selection=[])
         cancel_brush()
@@ -372,20 +384,65 @@ def main():
         key=re.sub(r"[^\w]","",value).casefold()
         return next((f for f in fonts if re.sub(r"[^\w]","",f).casefold()==key),value)
 
+    profile_view=ttk.Frame(root,style="Welcome.TFrame")
+    profile_view.columnconfigure(0,weight=1)
+    profile_view.rowconfigure(0,weight=1)
+    active_label="Технический"
+    profile_cancel=None
+    def configure_preset(action):
+        nonlocal profile_cancel
+        ws=state["workspace"]
+        if not ws or state["rendering"]:
+            return
+        existing=None
+        try:
+            if action==PRESET_ACTIONS[2]:
+                name=filedialog.askopenfilename(parent=root,filetypes=[("Профиль","*.json")])
+                if not name:
+                    return
+                initial=load_profile(Path(name))
+            elif action==PRESET_ACTIONS[1]:
+                initial=Profile(name="Мой стиль")
+            else:
+                existing=profiles.get(active_label)
+                initial=ws.options.get("profile") or builtin_profile(ws.options["template"],active_label)
+                if existing is None:
+                    initial=replace(initial,name=initial.name+" — мой стиль")
+        except Exception as exc:
+            message(str(exc))
+            return
+        state["configuring"]=True
+        chrome.grid_remove()
+        preview.grid_remove()
+        profile_view.grid(row=1,sticky="nsew")
+        def back():
+            nonlocal profile_cancel
+            profile_cancel=None
+            state["configuring"]=False
+            profile_view.grid_remove()
+            chrome.grid(row=0,sticky="ew")
+            preview.grid(row=1,sticky="nsew")
+        profile_cancel=edit_profile(profile_view,initial=initial,existing=existing,on_save=refresh_profiles,embedded=True,on_close=back)
+
     def update_fields():
         ws=state["workspace"]
         ranges=state["selection"]
         styles.configure(values=tuple(STYLES))
+        for button in (bullet_button,numbered_button,table_button):
+            button.configure(state="disabled",style="Toolbar.TButton")
         if not ws or not ranges:
             role.set("Стиль фрагмента");font.set("Шрифт");size.set("pt")
             return
         current=ws.model.selection_role(ranges)
+        if not any(ws.model.blocks()[i].locked for i,_,_ in ranges):
+            bullet_button.configure(state="normal",style="Accent.TButton" if current=="bullet" else "Toolbar.TButton")
+            numbered_button.configure(state="normal",style="Accent.TButton" if current=="numbered" else "Toolbar.TButton")
         try:
             ws.model.table_settings(ranges)
-            styles.configure(values=(*STYLES,"Параметры таблицы…"))
+            table_button.configure(state="normal",style="Accent.TButton")
         except ValueError:
             pass
-        labels={v:k for k,v in STYLES.items()}
+        labels={v:k for k,v in {**STYLES,**STRUCTURE_STYLES}.items()}
         labels.update(mixed="Разные стили",li="Список",td="Ячейка",th="Шапка таблицы")
         role.set(labels.get(current,current))
         family,points=preview.selection_format()
@@ -402,7 +459,7 @@ def main():
         if not preserve:
             update_fields()
         export_button.configure(state="disabled")
-        for control in (styles,font_box,size_box,brush_button):
+        for control in (styles,font_box,size_box,brush_button,bullet_button,numbered_button,table_button):
             control.configure(state="disabled")
         message("Вёрстка…")
         snapshot=state["workspace"].snapshot()
@@ -413,11 +470,18 @@ def main():
                 events.put(("render-error",generation,str(exc)))
         threading.Thread(target=worker,daemon=True).start()
     def switch(_=None):
+        nonlocal active_label
+        choice=preset.get()
+        if choice in PRESET_ACTIONS:
+            preset.set(active_label)
+            configure_preset(choice)
+            return
         ws=state["workspace"]
         if not ws or state["updating"]:
             return
         try:
             ws.preset(**options())
+            active_label=preset.get()
             state["dirty"]=True
             render()
         except Exception as exc:
@@ -534,6 +598,22 @@ def main():
             root.after(2200,lambda:message() if status.get()=="PDF сохранён" else None)
         except Exception as exc:
             messagebox.showerror("Экспорт PDF",str(exc),parent=root)
+    def toggle_list(kind):
+        if not state["selection"]:
+            return
+        current=state["workspace"].model.selection_role(state["selection"])
+        apply_values("normal" if current==kind else kind)
+
+    def table_menu():
+        if not state["selection"] or state["rendering"]:
+            return
+        menu=tk.Menu(root,tearoff=False)
+        for label,kind in (("Заголовок таблицы","table-heading"),("Ячейка таблицы","table-cell"),("Строка заголовков","table-row-heading"),("Обычная строка","table-row-cell")):
+            menu.add_command(label=label,command=lambda k=kind:apply_values(k))
+        menu.add_separator()
+        menu.add_command(label="Параметры таблицы…",command=table_dialog)
+        menu.tk_popup(table_button.winfo_rootx(),table_button.winfo_rooty()+table_button.winfo_height())
+
     def table_dialog():
         ws=state["workspace"]
         ranges=list(state["selection"])
@@ -580,8 +660,8 @@ def main():
             return
         menu=tk.Menu(root,tearoff=False)
         if state["selection"]:
-            for name in STYLES:
-                menu.add_command(label=name,command=lambda n=name:(role.set(n),apply()))
+            for name,kind in {**STYLES,**STRUCTURE_STYLES}.items():
+                menu.add_command(label=name,command=lambda k=kind:apply_values(k))
         if state["selection"]:
             try:
                 ws.model.table_settings(state["selection"])
@@ -679,7 +759,7 @@ def main():
                 elif kind=="update" and value:
                     state["update"]=value
                     update_button.configure(text=("Обновить " if sys.platform=="win32" else "Скачать ")+"v"+value.version)
-                    if not state["importing"]:
+                    if not state["importing"] and not state["configuring"]:
                         chrome.grid(row=0,sticky="ew")
                     update_button.pack(side="right",padx=6)
                     arrange_toolbar()
@@ -696,6 +776,10 @@ def main():
     def close():
         if state["updating"]:
             return
+        if state["configuring"]:
+            if profile_cancel:
+                profile_cancel()
+            return
         if state["importing"] and not confirm_input_discard():
             return
         if not discard_ok():
@@ -703,14 +787,14 @@ def main():
         preview.close()
         root.destroy()
     root.protocol("WM_DELETE_WINDOW",close)
-    root.bind("<Escape>",lambda e:cancel_input() if state["importing"] else cancel_brush())
+    root.bind("<Escape>",lambda e:profile_cancel() if state["configuring"] and profile_cancel else cancel_input() if state["importing"] else cancel_brush())
     root.bind("<Control-o>",lambda e:choose())
     root.bind("<Control-v>",paste_shortcut)
     if sys.platform=="darwin":
         root.bind("<Command-v>",paste_shortcut)
-    root.bind("<Control-s>",lambda e:None if state["importing"] else save())
-    root.bind("<Control-z>",lambda e:None if state["importing"] else history(False))
-    root.bind("<Control-y>",lambda e:None if state["importing"] else history(True))
+    root.bind("<Control-s>",lambda e:None if state["importing"] or state["configuring"] else save())
+    root.bind("<Control-z>",lambda e:None if state["importing"] or state["configuring"] else history(False))
+    root.bind("<Control-y>",lambda e:None if state["importing"] or state["configuring"] else history(True))
     root.after(80,poll)
     try:
         root.mainloop()

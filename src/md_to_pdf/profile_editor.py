@@ -24,13 +24,21 @@ LABELS = {
 }
 
 
-def edit_profile(parent, *, initial=None, existing=None, on_save):
-    win = tk.Toplevel(parent)
-    round_window(win)
-    win.title("Настройка стиля")
-    win.transient(parent)
-    win.geometry("720x620")
-    win.minsize(620, 530)
+def edit_profile(parent, *, initial=None, existing=None, on_save, embedded=False, on_close=None):
+    if embedded:
+        win=ttk.Frame(parent,style="Welcome.TFrame")
+        win.grid(row=0,column=0,sticky="nsew")
+    else:
+        win = tk.Toplevel(parent)
+        round_window(win)
+        win.title("Настройка стиля")
+        win.transient(parent)
+        win.geometry("720x620")
+        win.minsize(620, 530)
+    def finish():
+        win.destroy()
+        if on_close:
+            on_close()
     win.columnconfigure(0, weight=1)
     win.rowconfigure(0, weight=1)
     initial = initial or Profile()
@@ -137,8 +145,8 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
         p = value()
         target = existing or library_dir() / (uuid.uuid4().hex+".json")
         save_profile(p,target)
+        finish()
         on_save(target)
-        win.destroy()
     def export():
         p = value()
         name = filedialog.asksaveasfilename(parent=win,defaultextension=".json",filetypes=[("Brand profile","*.json")])
@@ -156,9 +164,12 @@ def edit_profile(parent, *, initial=None, existing=None, on_save):
         webbrowser.open(Path(target).resolve().as_uri())
     actions = ttk.Frame(win,padding=(14,0,14,14))
     actions.grid(sticky="ew")
-    for title, action in (("Предпросмотр PDF",preview),("Экспорт JSON",export),("Сохранить в библиотеку",save)):
+    entries=(("Экспорт JSON",export),("Сохранить пресет",save)) if embedded else (("Предпросмотр PDF",preview),("Экспорт JSON",export),("Сохранить в библиотеку",save))
+    for title, action in entries:
         ttk.Button(actions,text=title,command=lambda a=action:guarded(a)).pack(side="left",padx=4)
-    ttk.Button(actions,text="Отмена",command=win.destroy).pack(side="right")
+    ttk.Button(actions,text="Отмена",command=finish).pack(side="right")
+    if embedded:
+        return finish
     win.grab_set()
     parent.wait_window(win)
     if parent.winfo_exists() and isinstance(parent,tk.Toplevel):

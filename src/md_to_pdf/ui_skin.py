@@ -197,3 +197,43 @@ class Backdrop(tk.Canvas):
             self.coords(self.card_item,x,y)
             self.tag_lower(self.card_item,self.center)
         self.tag_lower(self.image_item)
+
+
+def toolbar_icon(master,name,size=22):
+    """Antialiased Office-style pictograms; no third-party icon artwork."""
+    k=4
+    im=Image.new("RGBA",(24*k,24*k),(0,0,0,0))
+    d=ImageDraw.Draw(im)
+    def line(points,fill=INK,width=1.5):
+        d.line([(round(x*k),round(y*k)) for x,y in points],fill=fill,width=round(width*k),joint="curve")
+    def poly(points,fill,outline=None):
+        d.polygon([(round(x*k),round(y*k)) for x,y in points],fill=fill)
+        if outline:
+            line(points+[points[0]],outline,1)
+    if name=="format":
+        # Familiar Word-style diagonal brush: gold bristles, silver ferrule,
+        # dark handle. Draw at 4x resolution for clean small-size edges.
+        poly([(10,11),(18,3),(20,2),(22,4),(21,6),(13,14)],"#596775","#394957")
+        poly([(7,10),(10,7),(16,13),(13,16)],"#e1e5e9","#707c88")
+        poly([(7,10),(13,16),(9,21),(6,20),(3,22),(2,19),(4,15)],"#e7af55","#a87536")
+        line([(6,12),(11,17)],"#f7d98b",1.2)
+        line([(5,15),(3.8,18.5)],"#bd803d",1)
+        line([(8,17),(6.7,19.5)],"#bd803d",1)
+    elif name in ("bullet","numbered"):
+        for i,y in enumerate((5,12,19),1):
+            line([(9,y),(21,y)],INK,1.6)
+            if name=="bullet":
+                d.ellipse((3*k,(y-1.4)*k,5.8*k,(y+1.4)*k),fill=BLUE)
+            else:
+                # Tiny numerals rendered as strokes, avoiding platform fonts.
+                if i==1: line([(3,y-1),(4.5,y-2),(4.5,y+2)],BLUE,1)
+                elif i==2: line([(3,y-1),(4,y-2),(5.5,y-1),(3,y+2),(5.5,y+2)],BLUE,1)
+                else: line([(3,y-2),(5.5,y-2),(4,y),(5.5,y+1),(4,y+2),(3,y+2)],BLUE,1)
+    elif name=="table":
+        d.rounded_rectangle((2*k,3*k,21*k,21*k),radius=2*k,fill="#ffffff",outline=INK,width=k)
+        d.rectangle((3*k,4*k,20*k,8*k),fill="#a7bfdc")
+        for x in (8.5,15):
+            line([(x,3),(x,21)],INK,1)
+        for y in (9,15):
+            line([(2,y),(21,y)],INK,1)
+    return ImageTk.PhotoImage(im.resize((size,size),Image.Resampling.LANCZOS),master=master)

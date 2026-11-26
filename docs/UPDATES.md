@@ -7,3 +7,5 @@ On a frozen desktop build, a background release check runs once at startup and d
 macOS currently offers the matching single ZIP download only; automatic .app replacement is not yet enabled. No code-signing certificate or notarization is configured. A checksum published alongside the binary is integrity checking, not a substitute for independent code-signing. Older versions without the updater require one final manual installation.
 
 Acceptance: successful frozen package tests, isolated Windows helper swap test, source unit tests, and manual update from beta 1 to a subsequent build on real Windows hardware. Do not claim that the last acceptance has occurred until verified.
+
+Beta publication policy: a verified Windows archive may be published even if macOS builds fail. Only verified artifacts are included and missing platforms are identified in release notes; stable releases still require all three platforms. Beta 11 recovery uses the original successful Windows artifact and original source commit, not unverified Mac binaries.

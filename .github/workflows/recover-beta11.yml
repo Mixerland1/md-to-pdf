@@ -1,0 +1,39 @@
+name: Recover verified Windows beta 11
+on:
+  push:
+    branches: ['develop/v0.4.0']
+    paths: ['.github/workflows/recover-beta11.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: desktop-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: e78629b6bb8c4680eef0e91d447a505653e2f231
+      - uses: actions/download-artifact@v4
+        with:
+          name: MD-to-PDF-Windows-x64
+          run-id: '45726913545'
+          github-token: ${{ github.token }}
+          path: release-assets
+      - name: Publish previously verified Windows archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/Mixerland1/md-to-pdf/actions/runs/45726913545 --jq '.head_sha' | grep -Fx e78629b6bb8c4680eef0e91d447a505653e2f231
+          gh api repos/Mixerland1/md-to-pdf/actions/runs/45726913545/jobs --jq '.jobs[] | select(.name=="windows") | .conclusion' | grep -Fx success
+          cd release-assets
+          unzip -tq MD-to-PDF-Windows-x64.zip
+          sha256sum MD-to-PDF-Windows-x64.zip > SHA256SUMS.txt
+          cp ../docs/RELEASE_0.4.0b11.md /tmp/beta11-notes.md
+          printf '\nWindows-only preview: both macOS builds failed their runtime smoke tests and are not published.\n' >> /tmp/beta11-notes.md
+          if ! gh release view v0.4.0b11 >/dev/null 2>&1; then
+            gh release create v0.4.0b11 MD-to-PDF-Windows-x64.zip SHA256SUMS.txt --target e78629b6bb8c4680eef0e91d447a505653e2f231 --title "MD to PDF v0.4.0b11" --notes-file /tmp/beta11-notes.md --prerelease --latest=false
+          fi

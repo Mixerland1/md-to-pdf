@@ -56,7 +56,7 @@ jobs:
           path: MD-to-PDF-macOS-${{ matrix.arch }}.zip
           if-no-files-found: error
   publish:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop/v0.4.0'
+    if: ${{ always() && needs.windows.result == 'success' && (github.ref == 'refs/heads/develop/v0.4.0' || (github.ref == 'refs/heads/main' && needs.macos.result == 'success')) }}
     needs: [windows, macos]
     runs-on: ubuntu-latest
     permissions:
@@ -84,12 +84,17 @@ jobs:
             flags+=(--prerelease --latest=false)
           fi
           cd release-assets
-          for file in MD-to-PDF-Windows-x64.zip MD-to-PDF-macOS-arm64.zip MD-to-PDF-macOS-x86_64.zip; do
-            test -s "$file"
+          test -s MD-to-PDF-Windows-x64.zip
+          cp "../docs/RELEASE_$version.md" /tmp/md-to-pdf-release-notes.md
+          for file in MD-to-PDF-macOS-arm64.zip MD-to-PDF-macOS-x86_64.zip; do
+            if [[ ! -s "$file" ]]; then
+              [[ "$GITHUB_REF" != refs/heads/main ]] || exit 1
+              printf '\n%s was not published: platform build or verification failed.\n' "$file" >> /tmp/md-to-pdf-release-notes.md
+            fi
           done
           sha256sum MD-to-PDF-*.zip > SHA256SUMS.txt
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release already exists; bump version for new binaries."
           else
-            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file "../docs/RELEASE_$version.md" "${flags[@]}"
+            gh release create "$tag" MD-to-PDF-*.zip SHA256SUMS.txt --target "$GITHUB_SHA" --title "MD to PDF $tag" --notes-file /tmp/md-to-pdf-release-notes.md "${flags[@]}"
           fi
